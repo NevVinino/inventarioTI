@@ -1,0 +1,289 @@
+@import url('admin_main.css');
+
+/* Estilos específicos del CRUD */
+
+.main-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 20px;
+}
+
+/* Tabla */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+table th, table td {
+    border: 1px solid #ccc;
+    padding: 12px;
+    text-align: center;
+}
+
+table th {
+    background-color: #34495e;
+    color: white;
+}
+
+table tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+/* Botón "Atrás" */
+.back-button {
+    display: inline-flex;
+    align-items: center;
+    margin: 20px 0;
+    text-decoration: none;
+    color: #2c3e50;
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.back-button img {
+    width: 20px;
+    height: 20px;
+    margin-right: 8px;
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.4);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 10% auto;
+    padding: 20px;
+    border-radius: 8px;
+    width: 80%;
+    max-width: 500px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+.close {
+    float: right;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+
+/*
+
+*/
+
+h1 {
+    text-align: center;
+    color: #ffffff;
+}
+
+h2{
+    text-align: center;
+    color: #2c3e50;
+}
+
+
+.back-button {
+    display: inline-flex;
+    align-items: center;
+    margin: 20px 40px;
+    text-decoration: none;
+    color: #2c3e50;
+    font-weight: bold;
+    font-size: 15px;
+    background-color: #ecf0f1;
+    padding: 6px 10px;
+    border-radius: 6px;
+    transition: background-color 0.3s ease;
+}
+
+.back-button:hover {
+    background-color: #d0d7de;
+}
+
+.back-button img {
+    width: 40px;
+    height: 40px;
+    margin-right: 20px;
+}
+
+
+/*
+
+*/
+/* MODAL ESTÉTICO Y MEJORADO */
+.modal-content {
+    background-color: #ffffff;
+    color: #2c3e50;
+    margin: 5% auto;
+    padding: 30px;
+    border-radius: 15px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.25);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    font-family: 'Segoe UI', sans-serif;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Botón "x" con diseño circular */
+.close {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    width: 40px;
+    height: 40px;
+    background-color: #e74c3c;   /* fondo rojo */
+    color: white;                /* X en blanco */
+    font-size: 22px;
+    font-weight: bold;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 40px;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.2s;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.close:hover {
+    background-color: #c0392b;
+    transform: scale(1.1);
+}
+
+
+
+/* Formulario interno del modal */
+.modal-content input,
+.modal-content select {
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.modal-content button {
+    margin-top: 10px;
+    padding: 12px;
+    background-color: #2980b9;
+    border: none;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+
+.modal-content button:hover {
+    background-color: #1f6393;
+}
+
+/* Animación de entrada del modal */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/*
+Estilo buscador y btn +Nuevo
+*/
+
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 0 10px;
+    flex-wrap: wrap;
+}
+
+.top-bar h2 {
+    flex: 1;
+    font-size: 24px;
+    color: #2c3e50;
+    margin: 0;
+}
+
+#buscador {
+    flex: 2;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 15px;
+    margin-right: 10px;
+    max-width: 300px;
+}
+
+#btnNuevo {
+    background-color: #3498db;
+    color: white;
+    padding: 8px 18px;
+    font-size: 15px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+#btnNuevo:hover {
+    background-color: #2980b9;
+}
+
+/*
+orden de los emotes de acciones
+*/
+/* Agrupación horizontal con espaciado */
+td .acciones {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+}
+
+/* Botones tipo ícono */
+td .acciones form {
+    margin: 0;
+    padding: 0;
+}
+
+td .acciones button.btn-icon {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    outline: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+td .acciones button.btn-icon img {
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    transition: transform 0.2s ease;
+}
+
+td .acciones button.btn-icon:hover img {
+    transform: scale(1.1);
+}
