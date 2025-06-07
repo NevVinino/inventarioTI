@@ -8,7 +8,16 @@
 <body>
     <div class="login-container">
         <h2>Iniciar Sesión</h2>
-        <div id="mensajeError" class="error" style="display: none;">⚠️ Usuario o contraseña incorrecta.</div>
+        
+        <?php
+        $error = $_GET["error"] ?? null;
+        if ($error === "credenciales") {
+            echo '<div class="error">⚠ Usuario o contraseña incorrecta.</div>';
+        } elseif ($error === "deshabilitado") {
+            echo '<div class="error">⚠ Este usuario está deshabilitado. Contacta al administrador.</div>';
+        }
+        ?>
+        
         <form id="loginForm" method="POST" action="login.php">
             <label for="username">Usuario</label>
             <input type="text" id="username" name="username" required>
@@ -20,7 +29,7 @@
         </form>
     </div>
     <script src="../../js/login/login.js"></script>
-    <script src="../../js/login/login_alert.js"></script>
+    <!-- <script src="../../js/login/login_alert.js"></script> -->
 
 </body>
 </html>

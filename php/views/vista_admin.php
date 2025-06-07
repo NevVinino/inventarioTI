@@ -11,7 +11,7 @@ include("../includes/verificar_acceso.php");
     <title>Panel del Administrador</title>
     <link rel="stylesheet" href="../../css/admin/vista_admin.css">
 
-    <link rel="stylesheet" href="../css/admin/vista_admin.css">
+    
 </head>
 <body>
     <header>
@@ -28,13 +28,15 @@ include("../includes/verificar_acceso.php");
         <table>
             <tr>
                 <td><a href="crud_usuarios.php"><img src="../../img/tenor.gif"><p>Crear Usuarios</p></a></td>
-                <td><a href="#"><img src="../../img/tenor.gif"><p>Gestionar Activos</p></a></td>
+                <td><a href="crud_persona.php"><img src="../../img/tenor.gif"><p>Crear personas</p></a></td>
+                <td><a href="crud_area.php"><img src="../../img/tenor.gif"><p>Crear Areas</p></a></td>
                 <td><a href="#"><img src="../../img/tenor.gif"><p>Reparaciones</p></a></td>
             </tr>
             <tr>
                 <td><a href="#"><img src="../../img/tenor.gif"><p>Asignaciones</p></a></td>
+                <td><a href="#"><img src="../../img/tenor.gif"><p>Asignaciones</p></a></td>
                 <td><a href="#"><img src="../../img/tenor.gif"><p>Reportes</p></a></td>
-                <td><a href="crud_persona.php"><img src="../../img/tenor.gif"><p>Crear personas</p></a></td>
+                <td><a href="#"><img src="../../img/tenor.gif"><p>Asignaciones</p></a></td>
             </tr>
         </table>
     </main>

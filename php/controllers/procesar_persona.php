@@ -9,29 +9,30 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $nombre = $_POST["nombre"] ?? '';
     $apellido = $_POST["apellido"] ?? '';
     $correo = $_POST["correo"] ?? '';
-    $contrasena = $_POST["contrasena"] ?? '';
     $celular = $_POST["celular"] ?? '';
-    $tipo = $_POST["tipo"] ?? '';
-    $jefe_inmediato = $_POST["jefe_inmediato"] ?? '';
-    $id_rol = $_POST["id_rol"] ?? '';
+    $jefe_inmediato = !empty($_POST["jefe_inmediato"]) ? intval($_POST["jefe_inmediato"]) : null;
+
+    $id_tipo = $_POST["id_tipo"] ?? '';
     $id_situacion_personal = $_POST["id_situacion_personal"] ?? '';
     $id_localidad = $_POST["id_localidad"] ?? '';
     $id_area = $_POST["id_area"] ?? '';
     $id_empresa = $_POST["id_empresa"] ?? '';
 
     if ($accion === "crear") {
-        $sql = "INSERT INTO persona (nombre, apellido, correo, contrasena, celular, tipo, jefe_inmediato,
-                id_rol, id_situacion_personal, id_localidad, id_area, id_empresa)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        $params = [$nombre, $apellido, $correo, $contrasena, $celular, $tipo, $jefe_inmediato,
-                   $id_rol, $id_situacion_personal, $id_localidad, $id_area, $id_empresa];
+        $sql = "INSERT INTO persona (nombre, apellido, correo, celular, jefe_inmediato,
+                id_tipo, id_situacion_personal, id_localidad, id_area, id_empresa)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        $params = [$nombre, $apellido, $correo, $celular, $jefe_inmediato,
+                   $id_tipo, $id_situacion_personal, $id_localidad, $id_area, $id_empresa];
+
     } elseif ($accion === "editar" && !empty($id_persona)) {
-        $sql = "UPDATE persona SET nombre = ?, apellido = ?, correo = ?, contrasena = ?, celular = ?,
-                tipo = ?, jefe_inmediato = ?, id_rol = ?, id_situacion_personal = ?, id_localidad = ?,
+        $sql = "UPDATE persona SET nombre = ?, apellido = ?, correo = ?, celular = ?,
+                jefe_inmediato = ?, id_tipo = ?, id_situacion_personal = ?, id_localidad = ?,
                 id_area = ?, id_empresa = ?
                 WHERE id_persona = ?";
-        $params = [$nombre, $apellido, $correo, $contrasena, $celular, $tipo, $jefe_inmediato,
-                   $id_rol, $id_situacion_personal, $id_localidad, $id_area, $id_empresa, $id_persona];
+        $params = [$nombre, $apellido, $correo, $celular, $jefe_inmediato,
+                   $id_tipo, $id_situacion_personal, $id_localidad, $id_area, $id_empresa, $id_persona];
+
     } elseif ($accion === "eliminar" && !empty($id_persona)) {
         $sql = "DELETE FROM persona WHERE id_persona = ?";
         $params = [$id_persona];
@@ -45,8 +46,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         header("Location: ../views/crud_persona.php?success=1");
         exit;
     } else {
-        echo "Error en la operación:";
-        print_r(sqlsrv_errors());
+        echo "Error en la operación:<br>";
+        print_r(sqlsrv_errors(), true);
     }
 }
 ?>

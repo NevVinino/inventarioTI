@@ -26,16 +26,17 @@ document.addEventListener("DOMContentLoaded", function () {
             document.getElementById("modal-title").textContent = "Editar persona";
             document.getElementById("accion").value = "editar";
 
+
             document.getElementById("id_persona").value = btn.dataset.id;
             document.getElementById("nombre").value = btn.dataset.nombre;
             document.getElementById("apellido").value = btn.dataset.apellido;
             document.getElementById("correo").value = btn.dataset.correo;
-            document.getElementById("contrasena").value = btn.dataset.contrasena;
+            
             document.getElementById("celular").value = btn.dataset.celular;
-            document.getElementById("tipo").value = btn.dataset.tipo;
             document.getElementById("jefe_inmediato").value = btn.dataset.jefe;
 
-            document.getElementById("id_rol").value = btn.dataset.rol;
+
+            document.getElementById("id_tipo").value = btn.dataset.tipo;
             document.getElementById("id_situacion_personal").value = btn.dataset.situacion;
             document.getElementById("id_localidad").value = btn.dataset.localidad;
             document.getElementById("id_area").value = btn.dataset.area;

@@ -4,17 +4,17 @@ include("../includes/conexion.php");
 $solo_admin = true;
 include("../includes/verificar_acceso.php");
 
-// Obtener roles, estados y empresas
+// Obtener roles, estados
 $roles = sqlsrv_query($conn, "SELECT * FROM rol");
 $estados = sqlsrv_query($conn, "SELECT * FROM estado_usuario");
-$empresas = sqlsrv_query($conn, "SELECT * FROM empresa");
 
 // Obtener lista de usuarios
-$sqlUsuarios = "SELECT u.id_usuario, u.username, r.id_rol, r.descripcion AS rol, e.id_estado_usuario, e.descripcion_estado, emp.id_empresa, emp.nombre AS empresa
+$sqlUsuarios = "SELECT u.id_usuario, u.username, r.id_rol, r.descripcion AS rol, 
+                       e.id_estado_usuario, e.vestado_usuario
                 FROM usuario u
                 JOIN rol r ON u.id_rol = r.id_rol
-                JOIN estado_usuario e ON u.id_estado_usuario = e.id_estado_usuario
-                JOIN empresa emp ON u.id_empresa = emp.id_empresa";
+                JOIN estado_usuario e ON u.id_estado_usuario = e.id_estado_usuario";
+
 $usuarios = sqlsrv_query($conn, $sqlUsuarios);
 ?>
 
@@ -53,7 +53,6 @@ $usuarios = sqlsrv_query($conn, $sqlUsuarios);
                     <th>Usuario</th>
                     <th>Rol</th>
                     <th>Estado</th>
-                    <th>Empresa</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
@@ -62,16 +61,14 @@ $usuarios = sqlsrv_query($conn, $sqlUsuarios);
                 <tr>
                     <td><?= $u['username'] ?></td>
                     <td><?= $u['rol'] ?></td>
-                    <td><?= $u['descripcion_estado'] ?></td>
-                    <td><?= $u['empresa'] ?></td>
+                    <td><?= $u['vestado_usuario'] ?></td>
                     <td>
                         <div class="acciones">
                             <button type="button" class="btn-icon btn-editar"
                                 data-id="<?= $u['id_usuario'] ?>"
                                 data-username="<?= htmlspecialchars($u['username']) ?>"
                                 data-id_rol="<?= $u['id_rol'] ?>"
-                                data-id_estado="<?= $u['id_estado_usuario'] ?>"
-                                data-id_empresa="<?= $u['id_empresa'] ?>">
+                                data-id_estado="<?= $u['id_estado_usuario'] ?>">
                                 <img src="../../img/editar.png" alt="Editar">
                             </button>
                             <form method="POST" action="../controllers/procesar_usuario.php" style="display:inline;" onsubmit="return confirm('¿Eliminar este usuario?');">
@@ -106,7 +103,7 @@ $usuarios = sqlsrv_query($conn, $sqlUsuarios);
 
                 <label>Rol:</label>
                 <select name="id_rol" id="id_rol" required>
-                    <?php sqlsrv_execute($roles); while ($r = sqlsrv_fetch_array($roles, SQLSRV_FETCH_ASSOC)) { ?>
+                    <?php while ($r = sqlsrv_fetch_array($roles, SQLSRV_FETCH_ASSOC)) { ?>
                         <option value="<?= $r['id_rol'] ?>"><?= $r['descripcion'] ?></option>
                     <?php } ?>
                 </select>
@@ -114,14 +111,7 @@ $usuarios = sqlsrv_query($conn, $sqlUsuarios);
                 <label>Estado:</label>
                 <select name="id_estado_usuario" id="id_estado_usuario" required>
                     <?php while ($e = sqlsrv_fetch_array($estados, SQLSRV_FETCH_ASSOC)) { ?>
-                        <option value="<?= $e['id_estado_usuario'] ?>"><?= $e['descripcion_estado'] ?></option>
-                    <?php } ?>
-                </select>
-
-                <label>Empresa:</label>
-                <select name="id_empresa" id="id_empresa" required>
-                    <?php while ($em = sqlsrv_fetch_array($empresas, SQLSRV_FETCH_ASSOC)) { ?>
-                        <option value="<?= $em['id_empresa'] ?>"><?= $em['nombre'] ?></option>
+                        <option value="<?= $e['id_estado_usuario'] ?>"><?= $e['vestado_usuario'] ?></option>
                     <?php } ?>
                 </select>
 
