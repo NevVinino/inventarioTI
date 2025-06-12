@@ -1,13 +1,57 @@
+
 document.addEventListener("DOMContentLoaded", function () {
     const modal = document.getElementById("modalPersona");
     const btnNuevo = document.getElementById("btnNuevo");
     const spanClose = document.querySelector(".close");
     const form = document.getElementById("formPersona");
 
+    // === Lógica para habilitar/deshabilitar "Jefe Inmediato" según tipo de persona ===
+    const tipoSelect = document.getElementById("id_tipo");
+    const jefeSelect = document.getElementById("jefe_inmediato");
+
+    function actualizarJefeInmediato() {
+        const tipoTexto = tipoSelect.options[tipoSelect.selectedIndex].text.toLowerCase();
+        if (tipoTexto === "gerente") {
+            jefeSelect.value = "";
+            jefeSelect.disabled = true;
+        } else {
+            jefeSelect.disabled = false;
+        }
+        filtrarOpcionesJefe();
+    }
+
+    tipoSelect.addEventListener("change", actualizarJefeInmediato);
+    
+    // === Lógica para filtrar opciones de jefe inmediato según tipo de persona ===
+    function filtrarOpcionesJefe() {
+    const tipoPersona = tipoSelect.options[tipoSelect.selectedIndex].text.toLowerCase();
+
+    Array.from(jefeSelect.options).forEach(option => {
+        const tipoJefe = option.dataset.tipo; // viene del <option data-tipo="...">
+
+        if (!tipoJefe) return; // opción "-- Sin jefe --", siempre visible
+
+        // Reglas de jerarquía
+        if (tipoPersona === "personal") {
+            // Personal puede tener como jefe a jefe de área o gerencia
+            option.hidden = false;
+        } else if (tipoPersona === "jefe area") {
+            // Jefe de área solo puede tener como jefe a gerente
+            option.hidden = (tipoJefe !== "gerente");
+        } else if (tipoPersona === "gerente" ) {
+            // Gerente no debe tener jefe, combo ya se desactiva en actualizarJefeInmediato()
+            option.hidden = false;
+        }
+    });
+    
+}
+
+    
     btnNuevo.addEventListener("click", function () {
         document.getElementById("modal-title").textContent = "Registrar persona";
         document.getElementById("accion").value = "crear";
         form.reset();
+        actualizarJefeInmediato(); // asegurar ejecutar la restricción de jefe inmediato
         modal.style.display = "block";
     });
 
@@ -37,6 +81,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
             document.getElementById("id_tipo").value = btn.dataset.tipo;
+            actualizarJefeInmediato(); // asegurar ejecutar la restricción de jefe inmediato
             document.getElementById("id_situacion_personal").value = btn.dataset.situacion;
             document.getElementById("id_localidad").value = btn.dataset.localidad;
             document.getElementById("id_area").value = btn.dataset.area;
@@ -57,3 +102,5 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 });
+
+

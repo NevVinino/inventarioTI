@@ -11,15 +11,18 @@ $areas = sqlsrv_query($conn, "SELECT * FROM area");
 $empresas = sqlsrv_query($conn, "SELECT * FROM empresa");
 
 // Consulta de personas
-$sql = "SELECT p.*, 
-               CONCAT(j.nombre, ' ', j.apellido) AS jefe_nombre,
-               t.nombre_tipo AS tipo,
-               s.situacion AS situacion,
-               l.localidad_nombre AS localidad,
-               a.nombre AS area_nombre,
-               e.nombre AS empresa_nombre
+$sql = "SELECT 
+            p.*, 
+            CONCAT(j.nombre, ' ', j.apellido) AS jefe_nombre,
+            tipo_j.nombre_tipo AS tipo_jefe_nombre,
+            t.nombre_tipo AS tipo,
+            s.situacion AS situacion,
+            l.localidad_nombre AS localidad,
+            a.nombre AS area_nombre,
+            e.nombre AS empresa_nombre
         FROM persona p
         LEFT JOIN persona j ON p.jefe_inmediato = j.id_persona
+        LEFT JOIN tipo tipo_j ON j.id_tipo = tipo_j.id_tipo
         JOIN tipo t ON p.id_tipo = t.id_tipo
         JOIN situacion_personal s ON p.id_situacion_personal = s.id_situacion
         JOIN localidad l ON p.id_localidad = l.id_localidad
@@ -28,12 +31,13 @@ $sql = "SELECT p.*,
 
 $personas = sqlsrv_query($conn, $sql);
 
-// Obtener lista de jefes (tipo = gerencia o jefe_area)
+// Obtener lista de jefes (tipo = Gerente o Jefe Area)
 $jefes = sqlsrv_query($conn, "
-    SELECT p.id_persona, p.nombre + ' ' + p.apellido AS nombre_completo
+    SELECT p.id_persona, p.nombre + ' ' + p.apellido AS nombre_completo,
+    t.nombre_tipo
     FROM persona p
     JOIN tipo t ON p.id_tipo = t.id_tipo
-    WHERE t.nombre_tipo IN ('gerencia', 'jefe_area')
+    WHERE t.nombre_tipo IN ('Gerente', 'Jefe Area')
 ");
 ?>
 
@@ -89,7 +93,20 @@ $jefes = sqlsrv_query($conn, "
                 <td><?= htmlspecialchars($p['apellido']) ?></td>
                 <td><?= htmlspecialchars($p['correo']) ?></td>
                 <td><?= htmlspecialchars($p['celular']) ?></td>
-                <td><?= $p['jefe_nombre'] ?? '—' ?></td>
+                <td>
+                    <?php
+                    if (is_null($p['jefe_inmediato'])) {
+                        if (strtolower($p['tipo']) === 'gerente' || strtolower($p['tipo']) === 'Gerente') {
+                            echo "Es gerente";
+                        } else {
+                            echo "- Sin jefe -";
+                        }
+                    } else {
+                        echo htmlspecialchars($p['jefe_nombre']) . " (" . htmlspecialchars($p['tipo_jefe_nombre']) . ")";
+                    }
+                    ?>
+                </td>
+
                 <td><?= htmlspecialchars($p['tipo']) ?></td>
                 <td><?= htmlspecialchars($p['situacion']) ?></td>
                 <td><?= htmlspecialchars($p['localidad']) ?></td>
@@ -150,8 +167,12 @@ $jefes = sqlsrv_query($conn, "
             <label>Jefe Inmediato:</label>
             <select name="jefe_inmediato" id="jefe_inmediato">
                 <option value="">-- Sin jefe --</option>
-                <?php sqlsrv_execute($jefes); while ($j = sqlsrv_fetch_array($jefes, SQLSRV_FETCH_ASSOC)) { ?>
-                    <option value="<?= $j['id_persona'] ?>"><?= $j['nombre_completo'] ?></option>
+                <?php sqlsrv_execute($jefes); while ($j = sqlsrv_fetch_array($jefes, SQLSRV_FETCH_ASSOC)) { 
+                    $tipo_jefe = isset($j['nombre_tipo']) ? strtolower($j['nombre_tipo']) : '';
+                ?>
+                    <option value="<?= $j['id_persona'] ?>" data-tipo="<?= $tipo_jefe ?>">
+                        <?= $j['nombre_completo'] ?> (<?= $j['nombre_tipo'] ?>)
+                    </option>
                 <?php } ?>
             </select>
 
@@ -198,3 +219,4 @@ $jefes = sqlsrv_query($conn, "
 <script src="../../js/admin/crud_persona.js"></script>
 </body>
 </html>
+
