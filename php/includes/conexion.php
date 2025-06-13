@@ -12,4 +12,11 @@ $conn = sqlsrv_connect($serverName, $connectionOptions);
 if (!$conn) {
     die("❌ Error de conexión: " . print_r(sqlsrv_errors(), true));
 }
+
+//Para probar conexión
+// if (!$conn) {
+//     die("❌ Error de conexión: " . print_r(sqlsrv_errors(), true));
+// } else {
+//     echo "✅ Conexión exitosa a la base de datos.";
+// }
 ?>
