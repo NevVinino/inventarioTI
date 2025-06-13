@@ -32,7 +32,12 @@ include("../includes/verificar_acceso.php");
                 <td><a href="crud_area.php"><img src="../../img/tenor.gif"><p>Crear Areas</p></a></td>
                 <td><a href="crud_localidad.php"><img src="../../img/tenor.gif"><p>Crear Localidad</p></a></td>
                 <td><a href="crud_empresa.php"><img src="../../img/tenor.gif"><p>Crear empresa</p></a></td>
+
+            </tr>
+            <tr>
                 <td><a href="crud_cpu.php"><img src="../../img/tenor.gif"><p>Crear CPU</p></a></td>
+                <td><a href="crud_ram.php"><img src="../../img/tenor.gif"><p>Crear RAM</p></a></td>
+                <td><a href="crud_storage.php"><img src="../../img/tenor.gif"><p>Crear Storage</p></a></td>
             </tr>
             <tr>
                 <td><a href="#"><img src="../../img/tenor.gif"><p>Asignaciones</p></a></td>
