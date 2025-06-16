@@ -38,6 +38,9 @@ include("../includes/verificar_acceso.php");
                 <td><a href="crud_cpu.php"><img src="../../img/tenor.gif"><p>Crear CPU</p></a></td>
                 <td><a href="crud_ram.php"><img src="../../img/tenor.gif"><p>Crear RAM</p></a></td>
                 <td><a href="crud_storage.php"><img src="../../img/tenor.gif"><p>Crear Storage</p></a></td>
+                <td><a href="crud_marca.php"><img src="../../img/tenor.gif"><p>Crear Marca</p></a></td>
+                <td><a href="crud_tipo_periferico.php"><img src="../../img/tenor.gif"><p>Crear Tipo de Periférico</p></a></td>
+                <td><a href="crud_periferico.php"><img src="../../img/tenor.gif"><p>Crear Periférico</p></a></td>
             </tr>
             <tr>
                 <td><a href="#"><img src="../../img/tenor.gif"><p>Asignaciones</p></a></td>
