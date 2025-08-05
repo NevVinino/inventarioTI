@@ -107,7 +107,6 @@ $activos = sqlsrv_query($conn, $sql);
                             data-nombreequipo="<?= htmlspecialchars($a['nombreEquipo']) ?>"
                             data-observaciones="<?= htmlspecialchars($a['observaciones']) ?>"
                             data-fechaentrega="<?= $a['fecha_entrega'] ? $a['fecha_entrega']->format('Y-m-d') : '' ?>"
-
                             data-area="<?= $a['id_area'] ?>"
                             data-persona="<?= $a['id_persona'] ?>"
                             data-usuario="<?= $a['id_usuario'] ?>"
@@ -152,12 +151,31 @@ $activos = sqlsrv_query($conn, $sql);
             <label>Fecha Compra:</label><input type="date" name="fechaCompra" id="fechaCompra">
             <label>Garantía Hasta:</label><input type="date" name="garantia" id="garantia">
             <label>Precio Compra:</label><input type="number" name="precioCompra" id="precioCompra" step="0.01">
-            <label>Antigüedad:</label><input type="text" name="antiguedad" id="antiguedad" readonly>
+
+            <label>
+                Antigüedad en días: <span id="antiguedadLegible" class="antiguedad-label">(No calculado)</span>
+            </label>
+            <input type="text" name="antiguedad" id="antiguedad" readonly>
+
             <label>Orden de Compra:</label><input type="text" name="ordenCompra" id="ordenCompra">
-            <label>Estado Garantía:</label><input type="text" name="estadoGarantia" id="estadoGarantia">
+
+            <div class="estado-garantia-container">
+                <label>Estado Garantía:</label>
+                <input type="hidden" name="estadoGarantia" id="estadoGarantia">
+                <div id="estadoGarantiaLabel" class="estado-garantia-label">(No calculado)</div>
+            </div>
+
             <label>IP:</label><input type="text" name="numeroIP" id="numeroIP">
             <label>Nombre Equipo:</label><input type="text" name="nombreEquipo" id="nombreEquipo">
-            <label>Observaciones:</label><textarea name="observaciones" id="observaciones"></textarea>
+
+            <label>Observaciones:</label>
+            <button type="button" id="toggleObservaciones">Mostrar</button>
+            <div id="contenedorObservaciones" style="display: none;">
+                <textarea name="observaciones" id="observaciones"></textarea>
+            </div>
+            
+            <br>
+
             <label>Fecha de Entrega:</label><input type="date" name="fecha_entrega" id="fecha_entrega" required>
 
             <?php
@@ -187,5 +205,6 @@ $activos = sqlsrv_query($conn, $sql);
 </div>
 
 <script src="../../js/admin/crud_activo.js"></script>
+
 </body>
 </html>

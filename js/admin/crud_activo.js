@@ -9,25 +9,96 @@ document.addEventListener("DOMContentLoaded", function () {
     const garantiaInput = document.getElementById("garantia");
     const precioInput = document.getElementById("precioCompra");
     const antiguedadInput = document.getElementById("antiguedad");
-    const fechaEntregaInput = document.getElementsByName("fecha_entrega")[0]; 
+    const fechaEntregaInput = document.getElementsByName("fecha_entrega")[0];
+    const estadoGarantiaInput = document.getElementById("estadoGarantia");
 
-    // === ABRIR MODAL NUEVO ===
+    // === LABELS VISUALES ===
+    const labelAntiguedad = document.getElementById("antiguedadLegible");
+    const labelGarantia = document.getElementById("estadoGarantiaLabel");
+
+
+    // === CÁLCULO DE ANTIGÜEDAD ===
+    function calcularAntiguedad() {
+        const fechaCompra = new Date(fechaCompraInput.value);
+        const hoy = new Date();
+
+        if (isNaN(fechaCompra)) {
+            antiguedadInput.value = "";
+            labelAntiguedad.textContent = "";
+            return;
+        }
+
+        const ms = hoy - fechaCompra;
+        const dias = Math.floor(ms / (1000 * 60 * 60 * 24));
+        antiguedadInput.value = dias;
+
+        const años = Math.floor(dias / 365);
+        const restoDias = dias % 365;
+        const meses = Math.floor(restoDias / 30);
+        const diasFinales = restoDias % 30;
+
+        const partes = [];
+        if (años > 0) partes.push(`${años} ${años === 1 ? "año" : "años"}`);
+        if (meses > 0) partes.push(`${meses} ${meses === 1 ? "mes" : "meses"}`);
+        if (diasFinales > 0 || partes.length === 0) partes.push(`${diasFinales} ${diasFinales === 1 ? "día" : "días"}`);
+
+        labelAntiguedad.textContent = `(${partes.join(", ")})`;
+    }
+
+    // === CÁLCULO DE ESTADO DE GARANTÍA ===
+    function calcularEstadoGarantia() {
+        const hoy = new Date().toISOString().split("T")[0];
+        const garantia = garantiaInput.value;
+
+        if (garantia) {
+            if (garantia >= hoy) {
+                estadoGarantiaInput.value = "Vigente";
+                labelGarantia.textContent = "(Vigente)";
+            } else {
+                estadoGarantiaInput.value = "No vigente";
+                labelGarantia.textContent = "(No vigente)";
+            }
+        } else {
+            estadoGarantiaInput.value = "Sin garantía";
+            labelGarantia.textContent = "(Sin garantía)";
+        }
+    }
+
+    // === TOGGLE OBSERVACIONES ===
+    const btnToggleObs = document.getElementById("toggleObservaciones");
+    const contenedorObs = document.getElementById("contenedorObservaciones");
+
+    btnToggleObs.addEventListener("click", function () {
+        if (contenedorObs.style.display === "none" || contenedorObs.style.display === "") {
+            contenedorObs.style.display = "block";
+            btnToggleObs.textContent = "Ocultar";
+        } else {
+            contenedorObs.style.display = "none";
+            btnToggleObs.textContent = "Mostrar";
+        }
+    });
+
+
+    // === EVENTOS ===
+    fechaCompraInput.addEventListener("change", calcularAntiguedad);
+    garantiaInput.addEventListener("change", calcularEstadoGarantia);
+
     btnNuevo.addEventListener("click", function () {
         document.getElementById("modal-title").textContent = "Registrar Activo";
         document.getElementById("accion").value = "crear";
         form.reset();
-        antiguedadInput.value = ""; // limpiar antigüedad
+        calcularAntiguedad();
+        calcularEstadoGarantia();
+        contenedorObs.style.display = "none";
         modal.style.display = "block";
     });
 
-    // === CERRAR MODAL ===
     spanClose.addEventListener("click", () => modal.style.display = "none");
 
     window.addEventListener("click", function (event) {
         if (event.target === modal) modal.style.display = "none";
     });
 
-    // === CARGAR DATOS EN EDICIÓN ===
     document.querySelectorAll(".btn-editar").forEach(function (btn) {
         btn.addEventListener("click", function () {
             document.getElementById("modal-title").textContent = "Editar Activo";
@@ -59,6 +130,9 @@ document.addEventListener("DOMContentLoaded", function () {
             document.getElementById("id_estado_activo").value = btn.dataset.estadoactivo;
             document.getElementById("id_tipo_activo").value = btn.dataset.tipoactivo;
 
+            calcularAntiguedad();
+            calcularEstadoGarantia();
+            contenedorObs.style.display = "block";
             modal.style.display = "block";
         });
     });
@@ -75,7 +149,7 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
-    // === VALIDACIONES ANTES DE GUARDAR ===
+    // === VALIDACIONES FINALES ===
     form.addEventListener("submit", function (e) {
         const hoy = new Date().toISOString().split("T")[0];
 
@@ -102,27 +176,7 @@ document.addEventListener("DOMContentLoaded", function () {
             e.preventDefault();
             return;
         }
-    });
 
-    // === CÁLCULO DE ANTIGÜEDAD ===
-    fechaCompraInput.addEventListener("change", function () {
-        const fechaCompra = new Date(fechaCompraInput.value);
-        const hoy = new Date();
-
-        if (isNaN(fechaCompra)) {
-            antiguedadInput.value = "";
-            return;
-        }
-
-        const diffMs = hoy - fechaCompra;
-        const dias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-        if (dias < 30) {
-            antiguedadInput.value = `${dias} días`;
-        } else if (dias < 365) {
-            antiguedadInput.value = `${Math.floor(dias / 30)} meses`;
-        } else {
-            antiguedadInput.value = `${Math.floor(dias / 365)} años`;
-        }
+        calcularEstadoGarantia();
     });
 });

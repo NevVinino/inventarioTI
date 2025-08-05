@@ -1,14 +1,13 @@
 @import url('admin_main.css');
 
-/* Estilos específicos del CRUD */
-
+/* CONTENEDOR GENERAL DEL CRUD */
 .main-container {
     max-width: 1200px;
     margin: 0 auto;
     padding: 40px 20px;
 }
 
-/* Tabla */
+/* TABLA DE ACTIVOS */
 table {
     width: 100%;
     border-collapse: collapse;
@@ -31,69 +30,7 @@ table tr:nth-child(even) {
     background-color: #f9f9f9;
 }
 
-/* Botón "Atrás" */
-.back-button {
-    display: inline-flex;
-    align-items: center;
-    margin: 20px 0;
-    text-decoration: none;
-    color: #2c3e50;
-    font-weight: bold;
-    font-size: 16px;
-}
-
-.back-button img {
-    width: 20px;
-    height: 20px;
-    margin-right: 8px;
-}
-
-/* Modal */
-.modal {
-    display: none;
-    position: fixed;
-    z-index: 999;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-    background-color: rgba(0,0,0,0.4);
-}
-
-.modal-content {
-    background-color: #fefefe;
-    margin: 10% auto;
-    padding: 20px;
-    border-radius: 8px;
-    width: 80%;
-    max-width: 500px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-}
-
-.close {
-    float: right;
-    font-size: 24px;
-    font-weight: bold;
-    cursor: pointer;
-}
-
-
-/*
-
-*/
-
-h1 {
-    text-align: center;
-    color: #ffffff;
-}
-
-h2{
-    text-align: center;
-    color: #2c3e50;
-}
-
-
+/* BOTÓN ATRÁS */
 .back-button {
     display: inline-flex;
     align-items: center;
@@ -118,11 +55,30 @@ h2{
     margin-right: 20px;
 }
 
+/* ENCABEZADOS */
+h1 {
+    text-align: center;
+    color: #ffffff;
+}
 
-/*
+h2 {
+    text-align: center;
+    color: #2c3e50;
+}
 
-*/
-/* MODAL ESTÉTICO Y MEJORADO */
+/* MODAL */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.4);
+}
+
 .modal-content {
     background-color: #ffffff;
     color: #2c3e50;
@@ -140,15 +96,15 @@ h2{
     animation: fadeIn 0.3s ease-in-out;
 }
 
-/* Botón "x" con diseño circular */
+/* BOTÓN "X" DE CIERRE DEL MODAL */
 .close {
     position: absolute;
     top: 15px;
     right: 15px;
     width: 40px;
     height: 40px;
-    background-color: #e74c3c;   /* fondo rojo */
-    color: white;                /* X en blanco */
+    background-color: #e74c3c;
+    color: white;
     font-size: 22px;
     font-weight: bold;
     border-radius: 50%;
@@ -167,11 +123,10 @@ h2{
     transform: scale(1.1);
 }
 
-
-
-/* Formulario interno del modal */
+/* INPUTS Y SELECTS DEL FORMULARIO */
 .modal-content input,
-.modal-content select {
+.modal-content select,
+.modal-content textarea {
     padding: 12px;
     border-radius: 6px;
     border: 1px solid #ccc;
@@ -180,6 +135,7 @@ h2{
     box-sizing: border-box;
 }
 
+/* BOTÓN DE GUARDAR */
 .modal-content button {
     margin-top: 10px;
     padding: 12px;
@@ -196,16 +152,13 @@ h2{
     background-color: #1f6393;
 }
 
-/* Animación de entrada del modal */
+/* ANIMACIÓN DE ENTRADA DEL MODAL */
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(-20px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
-/*
-Estilo buscador y btn +Nuevo
-*/
-
+/* BARRA SUPERIOR: BUSCADOR Y BOTÓN NUEVO */
 .top-bar {
     display: flex;
     justify-content: space-between;
@@ -247,10 +200,7 @@ Estilo buscador y btn +Nuevo
     background-color: #2980b9;
 }
 
-/*
-orden de los emotes de acciones
-*/
-/* Agrupación horizontal con espaciado */
+/* ACCIONES (EDITAR, ELIMINAR) EN CADA FILA */
 td .acciones {
     display: flex;
     justify-content: center;
@@ -258,7 +208,6 @@ td .acciones {
     gap: 20px;
 }
 
-/* Botones tipo ícono */
 td .acciones form {
     margin: 0;
     padding: 0;
@@ -286,4 +235,53 @@ td .acciones button.btn-icon img {
 
 td .acciones button.btn-icon:hover img {
     transform: scale(1.1);
+}
+
+/* ===== MEJORAS ADICIONALES ===== */
+
+/* Estilo para mostrar la antigüedad legible al costado  smash */
+.antiguedad-label {
+    font-size: 18px;
+    color: #1f6393;
+    margin-left: 8px;
+}
+
+/* Estado de garantía visual */
+.estado-garantia-label {
+    font-size: 18px;
+    color: #1f6393;
+    margin-left: 8px;
+}
+
+.estado-garantia-container {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Observaciones (contenedor colapsable) */
+#contenedorObservaciones {
+    margin-top: 10px;
+    transition: all 0.3s ease;
+}
+
+/* Botón para mostrar/ocultar observaciones */
+#toggleObservaciones {
+    background-color: #bdc3c7;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+#toggleObservaciones:hover {
+    background-color: #95a5a6;
+}
+
+/* Asegura que el textarea no se redimensione libremente */
+textarea#observaciones {
+    resize: none;
+    min-height: 100px;
 }
