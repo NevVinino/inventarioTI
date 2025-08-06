@@ -4,7 +4,7 @@ $solo_admin = true;
 include("../includes/verificar_acceso.php");
 
 // Consultas para selects
-$personas = sqlsrv_query($conn, "SELECT id_persona, nombre + ' ' + apellido AS nombre FROM persona");
+$personas = sqlsrv_query($conn, "SELECT id_persona, nombre + ' ' + apellido AS nombre, id_area FROM persona");
 $usuarios = sqlsrv_query($conn, "SELECT id_usuario, username FROM usuario");
 $areas = sqlsrv_query($conn, "SELECT id_area, nombre FROM area");
 $empresas = sqlsrv_query($conn, "SELECT id_empresa, nombre FROM empresa");
@@ -74,24 +74,54 @@ $activos = sqlsrv_query($conn, $sql);
     <table id="tablaActivos">
         <thead>
             <tr>
-                <th>Modelo</th>
-                <th>Serial</th>
-                <th>Nombre equipo</th>
                 <th>Persona</th>
-                <th>Estado</th>
+                <th>Nombre Equipo</th>
+                <th>Numero Serial</th>
+                <th>MAC</th>
+                <th>Numero IP</th>
                 <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
             <?php while ($a = sqlsrv_fetch_array($activos, SQLSRV_FETCH_ASSOC)) { ?>
             <tr>
-                <td><?= htmlspecialchars($a['modelo']) ?></td>
-                <td><?= htmlspecialchars($a['numberSerial']) ?></td>
-                <td><?= htmlspecialchars($a['nombreEquipo']) ?></td>
                 <td><?= htmlspecialchars($a['persona']) ?></td>
-                <td><?= htmlspecialchars($a['estado']) ?></td>
+                <td><?= htmlspecialchars($a['nombreEquipo']) ?></td>
+                <td><?= htmlspecialchars($a['numberSerial']) ?></td>
+                <td><?= htmlspecialchars($a['MAC']) ?></td>
+                <td><?= htmlspecialchars($a['numeroIP']) ?></td>
                 <td>
                     <div class="acciones">
+                        <button type="button" class="btn-icon btn-ver"
+                            data-id="<?= $a['id_activo'] ?>"
+                            data-modelo="<?= htmlspecialchars($a['modelo']) ?>"
+                            data-mac="<?= htmlspecialchars($a['MAC']) ?>"
+                            data-serial="<?= htmlspecialchars($a['numberSerial']) ?>"
+                            data-fechacompra="<?= $a['fechaCompra'] ? $a['fechaCompra']->format('Y-m-d') : '' ?>"
+                            data-garantia="<?= $a['garantia'] ? $a['garantia']->format('Y-m-d') : '' ?>"
+                            data-precio="<?= htmlspecialchars($a['precioCompra']) ?>"
+                            data-antiguedad="<?= htmlspecialchars($a['antiguedad']) ?>"
+                            data-orden="<?= htmlspecialchars($a['ordenCompra']) ?>"
+                            data-estadogarantia="<?= htmlspecialchars($a['estadoGarantia']) ?>"
+                            data-ip="<?= htmlspecialchars($a['numeroIP']) ?>"
+                            data-nombreequipo="<?= htmlspecialchars($a['nombreEquipo']) ?>"
+                            data-observaciones="<?= htmlspecialchars($a['observaciones']) ?>"
+                            data-fechaentrega="<?= $a['fecha_entrega'] ? $a['fecha_entrega']->format('Y-m-d') : '' ?>"
+                            data-area="<?= $a['id_area'] ?>"
+                            data-persona="<?= $a['id_persona'] ?>"
+                            data-usuario="<?= $a['id_usuario'] ?>"
+                            data-empresa="<?= $a['id_empresa'] ?>"
+                            data-marca="<?= $a['id_marca'] ?>"
+                            data-cpu="<?= $a['id_cpu'] ?>"
+                            data-ram="<?= $a['id_ram'] ?>"
+                            data-storage="<?= $a['id_storage'] ?>"
+                            data-estadoactivo="<?= $a['id_estado_activo'] ?>"
+                            data-tipoactivo="<?= $a['id_tipo_activo'] ?>"
+                        >
+                            <img src="../../img/ojo.png" alt="Ver">
+                        </button>
+
+
                         <button type="button" class="btn-icon btn-editar"
                             data-id="<?= $a['id_activo'] ?>"
                             data-modelo="<?= htmlspecialchars($a['modelo']) ?>"
@@ -179,8 +209,10 @@ $activos = sqlsrv_query($conn, $sql);
             <label>Fecha de Entrega:</label><input type="date" name="fecha_entrega" id="fecha_entrega" required>
 
             <?php
-            function select($name, $dataset, $id_field, $desc_field) {
-                echo "<label>" . ucfirst(str_replace('_', ' ', $name)) . ":</label>";
+            // Select genérico
+            function select($name, $dataset, $id_field, $desc_field, $customLabel = null) {
+                $labelText = $customLabel ?? ucfirst(str_replace('_', ' ', $name));
+                echo "<label>$labelText:</label>";
                 echo "<select name='$name' id='$name' required>";
                 while ($r = sqlsrv_fetch_array($dataset, SQLSRV_FETCH_ASSOC)) {
                     echo "<option value='{$r[$id_field]}'>" . htmlspecialchars($r[$desc_field]) . "</option>";
@@ -188,9 +220,25 @@ $activos = sqlsrv_query($conn, $sql);
                 echo "</select>";
             }
 
+
+            // Select especial para persona con atributo data-area
+            function select_personas_con_area($dataset) {
+                echo "<label>Persona:</label>";
+                echo "<select name='id_persona' id='id_persona' required>";
+                while ($r = sqlsrv_fetch_array($dataset, SQLSRV_FETCH_ASSOC)) {
+                    $id = $r["id_persona"];
+                    $nombre = htmlspecialchars($r["nombre"]);
+                    $id_area = $r["id_area"]; // Se requiere id_area en la consulta
+                    echo "<option value='$id' data-area='$id_area'>$nombre</option>";
+                }
+                echo "</select>";
+            }
+
             select("id_area", $areas, "id_area", "nombre");
-            select("id_persona", $personas, "id_persona", "nombre");
-            select("id_usuario", $usuarios, "id_usuario", "username");
+            select_personas_con_area(sqlsrv_query($conn, "SELECT id_persona, nombre + ' ' + apellido AS nombre, id_area FROM persona"));
+            
+            select("id_usuario", $usuarios, "id_usuario", "username", "Asistente TI encargado");
+
             select("id_empresa", $empresas, "id_empresa", "nombre");
             select("id_marca", $marcas, "id_marca", "nombre");
             select("id_cpu", $cpus, "id_cpu", "descripcion");
@@ -203,6 +251,25 @@ $activos = sqlsrv_query($conn, $sql);
         </form>
     </div>
 </div>
+
+<?php
+// Generar mapa de personas por área como JSON (más robusto)
+$resultPersonas = sqlsrv_query($conn, "SELECT id_persona, id_area FROM persona");
+$agrupadas = [];
+
+while ($p = sqlsrv_fetch_array($resultPersonas, SQLSRV_FETCH_ASSOC)) {
+    $id_area = $p["id_area"];
+    $id_persona = $p["id_persona"];
+    if (!isset($agrupadas[$id_area])) {
+        $agrupadas[$id_area] = [];
+    }
+    $agrupadas[$id_area][] = $id_persona;
+}
+?>
+<script>
+    const personasPorArea = <?= json_encode($agrupadas, JSON_NUMERIC_CHECK); ?>;
+</script>
+
 
 <script src="../../js/admin/crud_activo.js"></script>
 
