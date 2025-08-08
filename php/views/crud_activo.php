@@ -3,11 +3,12 @@ include("../includes/conexion.php");
 $solo_admin = true;
 include("../includes/verificar_acceso.php");
 
+
+// Recuperar datos de sesión
+$id_usuario_sesion = $_SESSION['id_usuario'] ?? '';
+$nombre_usuario_sesion = $_SESSION['username'] ?? '';
+
 // Consultas para selects
-$personas = sqlsrv_query($conn, "SELECT id_persona, nombre + ' ' + apellido AS nombre, id_area FROM persona");
-$usuarios = sqlsrv_query($conn, "SELECT id_usuario, username FROM usuario");
-$areas = sqlsrv_query($conn, "SELECT id_area, nombre FROM area");
-$empresas = sqlsrv_query($conn, "SELECT id_empresa, nombre FROM empresa");
 $cpus = sqlsrv_query($conn, "SELECT id_cpu, descripcion FROM cpu");
 $rams = sqlsrv_query($conn, "SELECT id_ram, capacidad + ' - ' + marca AS descripcion FROM ram");
 $storages = sqlsrv_query($conn, "SELECT id_storage, capacidad + ' - ' + tipo + ' - ' + marca AS descripcion FROM storage");
@@ -16,28 +17,44 @@ $tipos_activo = sqlsrv_query($conn, "SELECT id_tipo_activo, vtipo_activo FROM ti
 $marcas = sqlsrv_query($conn, "SELECT id_marca, nombre FROM marca");
 
 // Lista de activos
-$sql = "SELECT 
-            a.*, 
-            p.nombre + ' ' + p.apellido AS persona,
-            u.username, 
-            ar.nombre AS area, 
-            e.nombre AS empresa,
-            c.descripcion AS cpu, 
-            r.capacidad AS ram, 
-            s.capacidad AS storage,
-            ea.vestado_activo AS estado, 
-            ta.vtipo_activo AS tipo
-        FROM activo a
-        JOIN persona p ON a.id_persona = p.id_persona
-        JOIN usuario u ON a.id_usuario = u.id_usuario
-        JOIN area ar ON a.id_area = ar.id_area
-        JOIN empresa e ON a.id_empresa = e.id_empresa
-        JOIN cpu c ON a.id_cpu = c.id_cpu
-        JOIN ram r ON a.id_ram = r.id_ram
-        JOIN storage s ON a.id_storage = s.id_storage
-        JOIN estado_activo ea ON a.id_estado_activo = ea.id_estado_activo
-        JOIN tipo_activo ta ON a.id_tipo_activo = ta.id_tipo_activo";
-
+$sql = "
+SELECT 
+    a.id_activo,
+    a.nombreEquipo,
+    a.modelo,
+    a.MAC,
+    a.numberSerial,
+    a.fechaCompra,
+    a.garantia,
+    a.precioCompra,
+    a.antiguedad,
+    a.ordenCompra,
+    a.estadoGarantia,
+    a.numeroIP,
+    a.observaciones,
+    a.id_cpu,
+    a.id_ram,
+    a.id_storage,
+    a.id_estado_activo,
+    a.id_tipo_activo,
+    a.id_marca,
+    a.id_usuario,
+    c.descripcion AS cpu,
+    r.capacidad AS ram,
+    s.capacidad AS storage,
+    ea.vestado_activo AS estado,
+    ta.vtipo_activo AS tipo,
+    m.nombre AS marca,
+    u.username AS asistente
+FROM activo a
+LEFT JOIN cpu c ON a.id_cpu = c.id_cpu
+LEFT JOIN ram r ON a.id_ram = r.id_ram
+LEFT JOIN storage s ON a.id_storage = s.id_storage
+LEFT JOIN estado_activo ea ON a.id_estado_activo = ea.id_estado_activo
+LEFT JOIN tipo_activo ta ON a.id_tipo_activo = ta.id_tipo_activo
+LEFT JOIN marca m ON a.id_marca = m.id_marca
+LEFT JOIN usuario u ON a.id_usuario = u.id_usuario
+";
 $activos = sqlsrv_query($conn, $sql);
 ?>
 
@@ -52,7 +69,9 @@ $activos = sqlsrv_query($conn, $sql);
 
 <header>
     <div class="usuario-info">
-        <h1><?= htmlspecialchars($_SESSION["username"]) ?> <span class="rol"><?= $_SESSION["rol"] ?></span></h1>
+        <h1><?= htmlspecialchars($nombre_usuario_sesion) ?> 
+            <span class="rol"><?= isset($_SESSION["rol"]) ? htmlspecialchars($_SESSION["rol"]) : '' ?></span>
+        </h1>
     </div>
     <div class="avatar-contenedor">
         <img src="../../img/tenor.gif" alt="Avatar" class="avatar">
@@ -74,86 +93,61 @@ $activos = sqlsrv_query($conn, $sql);
     <table id="tablaActivos">
         <thead>
             <tr>
-                <th>Persona</th>
                 <th>Nombre Equipo</th>
-                <th>Numero Serial</th>
+                <th>Modelo</th>
+                <th>Serial</th>
                 <th>MAC</th>
-                <th>Numero IP</th>
+                <th>IP</th>
+                <th>Estado</th>
+                <th>Tipo</th>
+                <th>Marca</th>
+                <th>Asistente TI</th>
                 <th>Acciones</th>
             </tr>
         </thead>
         <tbody>
             <?php while ($a = sqlsrv_fetch_array($activos, SQLSRV_FETCH_ASSOC)) { ?>
             <tr>
-                <td><?= htmlspecialchars($a['persona']) ?></td>
-                <td><?= htmlspecialchars($a['nombreEquipo']) ?></td>
-                <td><?= htmlspecialchars($a['numberSerial']) ?></td>
-                <td><?= htmlspecialchars($a['MAC']) ?></td>
-                <td><?= htmlspecialchars($a['numeroIP']) ?></td>
+                <td><?= htmlspecialchars($a['nombreEquipo'] ?? '') ?></td>
+                <td><?= htmlspecialchars($a['modelo'] ?? '') ?></td>
+                <td><?= htmlspecialchars($a['numberSerial'] ?? '') ?></td>
+                <td><?= htmlspecialchars($a['MAC'] ?? '') ?></td>
+                <td><?= htmlspecialchars($a['numeroIP'] ?? '') ?></td>
+                <td><?= htmlspecialchars($a['estado'] ?? '') ?></td>
+                <td><?= htmlspecialchars($a['tipo'] ?? '') ?></td>
+                <td><?= htmlspecialchars($a['marca'] ?? '') ?></td>
+                <td><?= htmlspecialchars($a['asistente'] ?? '') ?></td>
                 <td>
                     <div class="acciones">
-                        <button type="button" class="btn-icon btn-ver"
-                            data-id="<?= $a['id_activo'] ?>"
-                            data-modelo="<?= htmlspecialchars($a['modelo']) ?>"
-                            data-mac="<?= htmlspecialchars($a['MAC']) ?>"
-                            data-serial="<?= htmlspecialchars($a['numberSerial']) ?>"
-                            data-fechacompra="<?= $a['fechaCompra'] ? $a['fechaCompra']->format('Y-m-d') : '' ?>"
-                            data-garantia="<?= $a['garantia'] ? $a['garantia']->format('Y-m-d') : '' ?>"
-                            data-precio="<?= htmlspecialchars($a['precioCompra']) ?>"
-                            data-antiguedad="<?= htmlspecialchars($a['antiguedad']) ?>"
-                            data-orden="<?= htmlspecialchars($a['ordenCompra']) ?>"
-                            data-estadogarantia="<?= htmlspecialchars($a['estadoGarantia']) ?>"
-                            data-ip="<?= htmlspecialchars($a['numeroIP']) ?>"
-                            data-nombreequipo="<?= htmlspecialchars($a['nombreEquipo']) ?>"
-                            data-observaciones="<?= htmlspecialchars($a['observaciones']) ?>"
-                            data-fechaentrega="<?= $a['fecha_entrega'] ? $a['fecha_entrega']->format('Y-m-d') : '' ?>"
-                            data-area="<?= $a['id_area'] ?>"
-                            data-persona="<?= $a['id_persona'] ?>"
-                            data-usuario="<?= $a['id_usuario'] ?>"
-                            data-empresa="<?= $a['id_empresa'] ?>"
-                            data-marca="<?= $a['id_marca'] ?>"
-                            data-cpu="<?= $a['id_cpu'] ?>"
-                            data-ram="<?= $a['id_ram'] ?>"
-                            data-storage="<?= $a['id_storage'] ?>"
-                            data-estadoactivo="<?= $a['id_estado_activo'] ?>"
-                            data-tipoactivo="<?= $a['id_tipo_activo'] ?>"
-                        >
-                            <img src="../../img/ojo.png" alt="Ver">
-                        </button>
-
-
+                        <!-- Botón editar -->
                         <button type="button" class="btn-icon btn-editar"
-                            data-id="<?= $a['id_activo'] ?>"
-                            data-modelo="<?= htmlspecialchars($a['modelo']) ?>"
-                            data-mac="<?= htmlspecialchars($a['MAC']) ?>"
-                            data-serial="<?= htmlspecialchars($a['numberSerial']) ?>"
-                            data-fechacompra="<?= $a['fechaCompra'] ? $a['fechaCompra']->format('Y-m-d') : '' ?>"
-                            data-garantia="<?= $a['garantia'] ? $a['garantia']->format('Y-m-d') : '' ?>"
-                            data-precio="<?= htmlspecialchars($a['precioCompra']) ?>"
-                            data-antiguedad="<?= htmlspecialchars($a['antiguedad']) ?>"
-                            data-orden="<?= htmlspecialchars($a['ordenCompra']) ?>"
-                            data-estadogarantia="<?= htmlspecialchars($a['estadoGarantia']) ?>"
-                            data-ip="<?= htmlspecialchars($a['numeroIP']) ?>"
-                            data-nombreequipo="<?= htmlspecialchars($a['nombreEquipo']) ?>"
-                            data-observaciones="<?= htmlspecialchars($a['observaciones']) ?>"
-                            data-fechaentrega="<?= $a['fecha_entrega'] ? $a['fecha_entrega']->format('Y-m-d') : '' ?>"
-                            data-area="<?= $a['id_area'] ?>"
-                            data-persona="<?= $a['id_persona'] ?>"
-                            data-usuario="<?= $a['id_usuario'] ?>"
-                            data-empresa="<?= $a['id_empresa'] ?>"
-                            data-marca="<?= $a['id_marca'] ?>"
-                            data-cpu="<?= $a['id_cpu'] ?>"
-                            data-ram="<?= $a['id_ram'] ?>"
-                            data-storage="<?= $a['id_storage'] ?>"
-                            data-estadoactivo="<?= $a['id_estado_activo'] ?>"
-                            data-tipoactivo="<?= $a['id_tipo_activo'] ?>"
+                            data-id="<?= htmlspecialchars($a['id_activo']) ?>"
+                            data-nombreequipo="<?= htmlspecialchars($a['nombreEquipo'] ?? '') ?>"
+                            data-modelo="<?= htmlspecialchars($a['modelo'] ?? '') ?>"
+                            data-mac="<?= htmlspecialchars($a['MAC'] ?? '') ?>"
+                            data-serial="<?= htmlspecialchars($a['numberSerial'] ?? '') ?>"
+                            data-fechacompra="<?= ($a['fechaCompra'] instanceof DateTime) ? $a['fechaCompra']->format('Y-m-d') : '' ?>"
+                            data-garantia="<?= ($a['garantia'] instanceof DateTime) ? $a['garantia']->format('Y-m-d') : '' ?>"
+                            data-precio="<?= htmlspecialchars($a['precioCompra'] ?? '') ?>"
+                            data-antiguedad="<?= htmlspecialchars($a['antiguedad'] ?? '') ?>"
+                            data-orden="<?= htmlspecialchars($a['ordenCompra'] ?? '') ?>"
+                            data-estadogarantia="<?= htmlspecialchars($a['estadoGarantia'] ?? '') ?>"
+                            data-ip="<?= htmlspecialchars($a['numeroIP'] ?? '') ?>"
+                            data-observaciones="<?= htmlspecialchars($a['observaciones'] ?? '') ?>"
+                            data-marca="<?= htmlspecialchars($a['id_marca'] ?? '') ?>"
+                            data-cpu="<?= htmlspecialchars($a['id_cpu'] ?? '') ?>"
+                            data-ram="<?= htmlspecialchars($a['id_ram'] ?? '') ?>"
+                            data-storage="<?= htmlspecialchars($a['id_storage'] ?? '') ?>"
+                            data-estadoactivo="<?= htmlspecialchars($a['id_estado_activo'] ?? '') ?>"
+                            data-tipoactivo="<?= htmlspecialchars($a['id_tipo_activo'] ?? '') ?>"
                         >
                             <img src="../../img/editar.png" alt="Editar">
                         </button>
 
+                        <!-- Botón eliminar -->
                         <form method="POST" action="../controllers/procesar_activo.php" onsubmit="return confirm('¿Eliminar este activo?');">
                             <input type="hidden" name="accion" value="eliminar">
-                            <input type="hidden" name="id_activo" value="<?= $a['id_activo'] ?>">
+                            <input type="hidden" name="id_activo" value="<?= htmlspecialchars($a['id_activo']) ?>">
                             <button type="submit" class="btn-icon">
                                 <img src="../../img/eliminar.png" alt="Eliminar">
                             </button>
@@ -167,27 +161,48 @@ $activos = sqlsrv_query($conn, $sql);
 </div>
 
 <!-- Modal para registrar/editar activo -->
-<div id="modalActivo" class="modal">
+<div id="modalActivo" class="modal" style="display:none;">
     <div class="modal-content">
         <span class="close">&times;</span>
         <h3 id="modal-title">Registrar Activo</h3>
+        
         <form id="formActivo" method="POST" action="../controllers/procesar_activo.php">
             <input type="hidden" name="accion" id="accion" value="crear">
             <input type="hidden" name="id_activo" id="id_activo">
+            
+            <label>Usuario Responsable:</label>
+            <input type="text" value="<?= isset($_SESSION['username']) ? htmlspecialchars($_SESSION['username']) : '' ?>" readonly>
+            <input type="hidden" name="id_usuario" value="<?= isset($_SESSION['id_usuario']) ? htmlspecialchars($_SESSION['id_usuario']) : '' ?>">
 
-            <label>Modelo:</label><input type="text" name="modelo" id="modelo" required>
-            <label>MAC:</label><input type="text" name="mac" id="mac">
-            <label>Serial:</label><input type="text" name="numberSerial" id="numberSerial" required>
-            <label>Fecha Compra:</label><input type="date" name="fechaCompra" id="fechaCompra">
-            <label>Garantía Hasta:</label><input type="date" name="garantia" id="garantia">
-            <label>Precio Compra:</label><input type="number" name="precioCompra" id="precioCompra" step="0.01">
+            <label>Nombre Equipo:</label>
+            <input type="text" name="nombreEquipo" id="nombreEquipo" required>
+
+            <label>Modelo:</label>
+            <input type="text" name="modelo" id="modelo" required>
+
+            <label>MAC:</label>
+            <input type="text" name="mac" id="mac">
+
+            <label>Serial:</label>
+            <input type="text" name="numberSerial" id="numberSerial" required>
+
+            <label>Fecha Compra:</label>
+            <input type="date" name="fechaCompra" id="fechaCompra">
+
+            <label>Garantía Hasta:</label>
+            <input type="date" name="garantia" id="garantia">
+
+            <label>Precio Compra:</label>
+            <input type="number" name="precioCompra" id="precioCompra" step="0.01">
 
             <label>
-                Antigüedad en días: <span id="antiguedadLegible" class="antiguedad-label">(No calculado)</span>
+                Antigüedad en días: 
+                <span id="antiguedadLegible" class="antiguedad-label">(No calculado)</span>
             </label>
             <input type="text" name="antiguedad" id="antiguedad" readonly>
 
-            <label>Orden de Compra:</label><input type="text" name="ordenCompra" id="ordenCompra">
+            <label>Orden de Compra:</label>
+            <input type="text" name="ordenCompra" id="ordenCompra">
 
             <div class="estado-garantia-container">
                 <label>Estado Garantía:</label>
@@ -195,51 +210,30 @@ $activos = sqlsrv_query($conn, $sql);
                 <div id="estadoGarantiaLabel" class="estado-garantia-label">(No calculado)</div>
             </div>
 
-            <label>IP:</label><input type="text" name="numeroIP" id="numeroIP">
-            <label>Nombre Equipo:</label><input type="text" name="nombreEquipo" id="nombreEquipo">
+            <label>IP:</label>
+            <input type="text" name="numeroIP" id="numeroIP">
 
             <label>Observaciones:</label>
             <button type="button" id="toggleObservaciones">Mostrar</button>
             <div id="contenedorObservaciones" style="display: none;">
                 <textarea name="observaciones" id="observaciones"></textarea>
             </div>
-            
-            <br>
-
-            <label>Fecha de Entrega:</label><input type="date" name="fecha_entrega" id="fecha_entrega" required>
 
             <?php
-            // Select genérico
             function select($name, $dataset, $id_field, $desc_field, $customLabel = null) {
                 $labelText = $customLabel ?? ucfirst(str_replace('_', ' ', $name));
                 echo "<label>$labelText:</label>";
                 echo "<select name='$name' id='$name' required>";
-                while ($r = sqlsrv_fetch_array($dataset, SQLSRV_FETCH_ASSOC)) {
-                    echo "<option value='{$r[$id_field]}'>" . htmlspecialchars($r[$desc_field]) . "</option>";
+                if ($dataset) {
+                    while ($r = sqlsrv_fetch_array($dataset, SQLSRV_FETCH_ASSOC)) {
+                        $val = $r[$id_field] ?? '';
+                        $txt = $r[$desc_field] ?? '';
+                        echo "<option value='" . htmlspecialchars($val) . "'>" . htmlspecialchars($txt) . "</option>";
+                    }
                 }
                 echo "</select>";
             }
 
-
-            // Select especial para persona con atributo data-area
-            function select_personas_con_area($dataset) {
-                echo "<label>Persona:</label>";
-                echo "<select name='id_persona' id='id_persona' required>";
-                while ($r = sqlsrv_fetch_array($dataset, SQLSRV_FETCH_ASSOC)) {
-                    $id = $r["id_persona"];
-                    $nombre = htmlspecialchars($r["nombre"]);
-                    $id_area = $r["id_area"]; // Se requiere id_area en la consulta
-                    echo "<option value='$id' data-area='$id_area'>$nombre</option>";
-                }
-                echo "</select>";
-            }
-
-            select("id_area", $areas, "id_area", "nombre");
-            select_personas_con_area(sqlsrv_query($conn, "SELECT id_persona, nombre + ' ' + apellido AS nombre, id_area FROM persona"));
-            
-            select("id_usuario", $usuarios, "id_usuario", "username", "Asistente TI encargado");
-
-            select("id_empresa", $empresas, "id_empresa", "nombre");
             select("id_marca", $marcas, "id_marca", "nombre");
             select("id_cpu", $cpus, "id_cpu", "descripcion");
             select("id_ram", $rams, "id_ram", "descripcion");
@@ -247,29 +241,12 @@ $activos = sqlsrv_query($conn, $sql);
             select("id_estado_activo", $estados, "id_estado_activo", "vestado_activo");
             select("id_tipo_activo", $tipos_activo, "id_tipo_activo", "vtipo_activo");
             ?>
+
+            <br>
             <button type="submit">Guardar</button>
         </form>
     </div>
 </div>
-
-<?php
-// Generar mapa de personas por área como JSON (más robusto)
-$resultPersonas = sqlsrv_query($conn, "SELECT id_persona, id_area FROM persona");
-$agrupadas = [];
-
-while ($p = sqlsrv_fetch_array($resultPersonas, SQLSRV_FETCH_ASSOC)) {
-    $id_area = $p["id_area"];
-    $id_persona = $p["id_persona"];
-    if (!isset($agrupadas[$id_area])) {
-        $agrupadas[$id_area] = [];
-    }
-    $agrupadas[$id_area][] = $id_persona;
-}
-?>
-<script>
-    const personasPorArea = <?= json_encode($agrupadas, JSON_NUMERIC_CHECK); ?>;
-</script>
-
 
 <script src="../../js/admin/crud_activo.js"></script>
 

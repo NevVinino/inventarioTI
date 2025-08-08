@@ -1,30 +1,51 @@
 document.addEventListener("DOMContentLoaded", function () {
+    // --- elementos principales (pueden ser nulos, comprobamos más abajo) ---
     const modal = document.getElementById("modalActivo");
     const btnNuevo = document.getElementById("btnNuevo");
     const spanClose = document.querySelector(".close");
     const form = document.getElementById("formActivo");
 
-    // === INPUTS ===
+    // --- inputs del formulario ---
     const fechaCompraInput = document.getElementById("fechaCompra");
     const garantiaInput = document.getElementById("garantia");
     const precioInput = document.getElementById("precioCompra");
     const antiguedadInput = document.getElementById("antiguedad");
-    const fechaEntregaInput = document.getElementsByName("fecha_entrega")[0];
+    const fechaEntregaNodeList = document.getElementsByName("fecha_entrega");
+    const fechaEntregaInput = (fechaEntregaNodeList && fechaEntregaNodeList.length) ? fechaEntregaNodeList[0] : null;
     const estadoGarantiaInput = document.getElementById("estadoGarantia");
 
-    // === LABELS VISUALES ===
-    const labelAntiguedad = document.getElementById("antiguedadLegible");
-    const labelGarantia = document.getElementById("estadoGarantiaLabel");
+    // --- labels visuales ---
+    const labelAntiguedad = document.getElementById("antiguedadLegible") || null;
+    const labelGarantia = document.getElementById("estadoGarantiaLabel") || null;
 
+    // --- observaciones UI ---
+    const btnToggleObs = document.getElementById("toggleObservaciones");
+    const contenedorObs = document.getElementById("contenedorObservaciones");
 
-    // === CÁLCULO DE ANTIGÜEDAD ===
+    // --- selects para filtrado área/persona ---
+    const selectArea = document.getElementById("id_area");
+    const selectPersona = document.getElementById("id_persona");
+
+    // --- mapa personasPorArea ---
+    if (typeof window.personasPorArea === 'undefined') {
+        window.personasPorArea = {};
+    }
+
+    // --- utilidades ---
+    function safeSetText(el, text) {
+        if (!el) return;
+        el.textContent = text;
+    }
+
+    // --- cálculo antigüedad ---
     function calcularAntiguedad() {
+        if (!fechaCompraInput || !antiguedadInput) return;
         const fechaCompra = new Date(fechaCompraInput.value);
         const hoy = new Date();
 
         if (isNaN(fechaCompra)) {
             antiguedadInput.value = "";
-            labelAntiguedad.textContent = "";
+            safeSetText(labelAntiguedad, "(No calculado)");
             return;
         }
 
@@ -42,234 +63,298 @@ document.addEventListener("DOMContentLoaded", function () {
         if (meses > 0) partes.push(`${meses} ${meses === 1 ? "mes" : "meses"}`);
         if (diasFinales > 0 || partes.length === 0) partes.push(`${diasFinales} ${diasFinales === 1 ? "día" : "días"}`);
 
-        labelAntiguedad.textContent = `(${partes.join(", ")})`;
+        safeSetText(labelAntiguedad, `(${partes.join(", ")})`);
     }
 
-    // === CÁLCULO DE ESTADO DE GARANTÍA ===
+    // --- cálculo estado garantía ---
     function calcularEstadoGarantia() {
+        if (!garantiaInput || !estadoGarantiaInput) return;
         const hoy = new Date().toISOString().split("T")[0];
         const garantia = garantiaInput.value;
 
         if (garantia) {
             if (garantia >= hoy) {
                 estadoGarantiaInput.value = "Vigente";
-                labelGarantia.textContent = "(Vigente)";
+                safeSetText(labelGarantia, "(Vigente)");
             } else {
                 estadoGarantiaInput.value = "No vigente";
-                labelGarantia.textContent = "(No vigente)";
+                safeSetText(labelGarantia, "(No vigente)");
             }
         } else {
             estadoGarantiaInput.value = "Sin garantía";
-            labelGarantia.textContent = "(Sin garantía)";
+            safeSetText(labelGarantia, "(Sin garantía)");
         }
     }
 
-    // === TOGGLE OBSERVACIONES ===
-    const btnToggleObs = document.getElementById("toggleObservaciones");
-    const contenedorObs = document.getElementById("contenedorObservaciones");
+    // --- toggle observaciones ---
+    if (btnToggleObs && contenedorObs) {
+        btnToggleObs.addEventListener("click", function () {
+            if (contenedorObs.style.display === "none" || contenedorObs.style.display === "") {
+                contenedorObs.style.display = "block";
+                btnToggleObs.textContent = "Ocultar";
+            } else {
+                contenedorObs.style.display = "none";
+                btnToggleObs.textContent = "Mostrar";
+            }
+        });
+    }
 
-    btnToggleObs.addEventListener("click", function () {
-        if (contenedorObs.style.display === "none" || contenedorObs.style.display === "") {
-            contenedorObs.style.display = "block";
-            btnToggleObs.textContent = "Ocultar";
-        } else {
-            contenedorObs.style.display = "none";
-            btnToggleObs.textContent = "Mostrar";
-        }
-    });
+    // --- listeners seguros ---
+    if (fechaCompraInput) fechaCompraInput.addEventListener("change", calcularAntiguedad);
+    if (garantiaInput) garantiaInput.addEventListener("change", calcularEstadoGarantia);
 
+    // --- abrir modal "Nuevo" ---
+    if (btnNuevo) {
+        btnNuevo.addEventListener("click", function () {
+            if (!modal) {
+                console.warn("Modal no encontrado en la página.");
+                return;
+            }
 
-    // === EVENTOS ===
-    fechaCompraInput.addEventListener("change", calcularAntiguedad);
-    garantiaInput.addEventListener("change", calcularEstadoGarantia);
+            const modalTitle = document.getElementById("modal-title");
+            if (modalTitle) modalTitle.textContent = "Registrar Activo";
+            const accionField = document.getElementById("accion");
+            if (accionField) accionField.value = "crear";
 
-    btnNuevo.addEventListener("click", function () {
-        document.getElementById("modal-title").textContent = "Registrar Activo";
-        document.getElementById("accion").value = "crear";
-        form.reset();
-
-        // Habilita todos los campos del formulario
-        modal.querySelectorAll("input, select, textarea").forEach(el => el.disabled = false);
-
-        // Muestra el botón de guardar
-        form.querySelector("button[type='submit']").style.display = "block";
-
-        calcularAntiguedad();
-        calcularEstadoGarantia();
-
-        // Restablece visibilidad de observaciones
-        document.getElementById("toggleObservaciones").textContent = "Mostrar";
-        contenedorObs.style.display = "none";
-
-        modal.style.display = "block";
-    });
-
-
-    spanClose.addEventListener("click", () => modal.style.display = "none");
-
-    window.addEventListener("click", function (event) {
-        if (event.target === modal) modal.style.display = "none";
-    });
-
-    document.querySelectorAll(".btn-editar").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-            document.getElementById("modal-title").textContent = "Editar Activo";
-            document.getElementById("accion").value = "editar";
-
-            document.getElementById("id_activo").value = btn.dataset.id;
-            document.getElementById("modelo").value = btn.dataset.modelo;
-            document.getElementById("mac").value = btn.dataset.mac;
-            document.getElementById("numberSerial").value = btn.dataset.serial;
-            document.getElementById("fechaCompra").value = btn.dataset.fechacompra;
-            document.getElementById("garantia").value = btn.dataset.garantia;
-            document.getElementById("precioCompra").value = btn.dataset.precio;
-            document.getElementById("antiguedad").value = btn.dataset.antiguedad;
-            document.getElementById("ordenCompra").value = btn.dataset.orden;
-            document.getElementById("estadoGarantia").value = btn.dataset.estadogarantia;
-            document.getElementById("numeroIP").value = btn.dataset.ip;
-            document.getElementById("nombreEquipo").value = btn.dataset.nombreequipo;
-            document.getElementById("observaciones").value = btn.dataset.observaciones;
-            document.getElementById("fecha_entrega").value = btn.dataset.fechaentrega;
-
-            document.getElementById("id_area").value = btn.dataset.area;
-            document.getElementById("id_persona").value = btn.dataset.persona;
-            document.getElementById("id_usuario").value = btn.dataset.usuario;
-            document.getElementById("id_empresa").value = btn.dataset.empresa;
-            document.getElementById("id_marca").value = btn.dataset.marca;
-            document.getElementById("id_cpu").value = btn.dataset.cpu;
-            document.getElementById("id_ram").value = btn.dataset.ram;
-            document.getElementById("id_storage").value = btn.dataset.storage;
-            document.getElementById("id_estado_activo").value = btn.dataset.estadoactivo;
-            document.getElementById("id_tipo_activo").value = btn.dataset.tipoactivo;
-
-            // ✅ Restaurar estado editable
-            form.querySelector("button[type='submit']").style.display = "block";
+            if (form) form.reset();
             modal.querySelectorAll("input, select, textarea").forEach(el => el.disabled = false);
+
+            if (form) {
+                const submitBtn = form.querySelector("button[type='submit']");
+                if (submitBtn) submitBtn.style.display = "block";
+            }
+
+            safeSetText(labelAntiguedad, "(No calculado)");
+            safeSetText(labelGarantia, "(No calculado)");
+            if (btnToggleObs) btnToggleObs.textContent = "Mostrar";
+            if (contenedorObs) contenedorObs.style.display = "none";
+
+            if (selectArea && selectPersona) {
+                filterPersonasByArea(selectArea.value);
+            }
 
             calcularAntiguedad();
             calcularEstadoGarantia();
 
-            contenedorObs.style.display = "block";
             modal.style.display = "block";
+            const firstInput = modal.querySelector("input:not([type=hidden]), select, textarea");
+            if (firstInput) {
+                try { firstInput.focus(); } catch (e) {}
+            }
+        });
+    }
+
+    // --- cerrar modal ---
+    if (spanClose && modal) {
+        spanClose.addEventListener("click", () => modal.style.display = "none");
+    }
+    if (modal) {
+        window.addEventListener("click", function (event) {
+            if (event.target === modal) modal.style.display = "none";
+        });
+        window.addEventListener("keydown", function (ev) {
+            if (ev.key === "Escape") modal.style.display = "none";
+        });
+    }
+
+    // --- utilidad para rellenar formulario ---
+    const datasetToField = {
+        id: 'id_activo',
+        modelo: 'modelo',
+        mac: 'mac',
+        serial: 'numberSerial',
+        fechacompra: 'fechaCompra',
+        garantia: 'garantia',
+        precio: 'precioCompra',
+        antiguedad: 'antiguedad',
+        orden: 'ordenCompra',
+        estadogarantia: 'estadoGarantia',
+        ip: 'numeroIP',
+        nombreequipo: 'nombreEquipo',
+        observaciones: 'observaciones',
+        fechaentrega: 'fecha_entrega',
+        area: 'id_area',
+        persona: 'id_persona',
+        usuario: 'id_usuario',
+        empresa: 'id_empresa',
+        marca: 'id_marca',
+        cpu: 'id_cpu',
+        ram: 'id_ram',
+        storage: 'id_storage',
+        estadoactivo: 'id_estado_activo',
+        tipoactivo: 'id_tipo_activo'
+    };
+
+    function rellenarDesdeDataset(dataset) {
+        if (!dataset) return;
+
+        if (dataset.area && selectArea) {
+            try { selectArea.value = dataset.area; } catch (e) {}
+            filterPersonasByArea(selectArea.value);
+        }
+
+        Object.entries(datasetToField).forEach(([dataKey, fieldId]) => {
+            if (dataKey === 'area') return;
+            const val = dataset[dataKey];
+            if (typeof val === 'undefined') return;
+            const el = document.getElementById(fieldId);
+            if (!el) return;
+            if (el.tagName === 'SELECT') {
+                const optionExists = Array.from(el.options).some(o => o.value === val);
+                if (optionExists) {
+                    el.value = val;
+                } else {
+                    try { el.value = val; } catch (e) {}
+                }
+            } else {
+                el.value = val;
+            }
+        });
+    }
+
+    // --- editar ---
+    document.querySelectorAll(".btn-editar").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            if (!modal) return;
+            const modalTitle = document.getElementById("modal-title");
+            if (modalTitle) modalTitle.textContent = "Editar Activo";
+            const accionField = document.getElementById("accion");
+            if (accionField) accionField.value = "editar";
+
+            rellenarDesdeDataset(btn.dataset);
+
+            modal.querySelectorAll("input, select, textarea").forEach(el => el.disabled = false);
+            if (form) {
+                const submitBtn = form.querySelector("button[type='submit']");
+                if (submitBtn) submitBtn.style.display = "block";
+            }
+
+            if (contenedorObs) contenedorObs.style.display = "block";
+            if (btnToggleObs) btnToggleObs.textContent = "Ocultar";
+
+            calcularAntiguedad();
+            calcularEstadoGarantia();
+
+            modal.style.display = "block";
+            const firstInput = modal.querySelector("input:not([type=hidden]), select, textarea");
+            if (firstInput) try { firstInput.focus(); } catch (e) {}
         });
     });
 
-
+    // --- ver ---
     document.querySelectorAll(".btn-ver").forEach(function (btn) {
         btn.addEventListener("click", function () {
-            document.getElementById("modal-title").textContent = "Vista del Activo";
-            document.getElementById("accion").value = ""; // acción vacía
+            if (!modal) return;
+            const modalTitle = document.getElementById("modal-title");
+            if (modalTitle) modalTitle.textContent = "Vista del Activo";
+            const accionField = document.getElementById("accion");
+            if (accionField) accionField.value = "";
 
-            // Rellenar campos
-            document.getElementById("id_activo").value = btn.dataset.id;
-            document.getElementById("modelo").value = btn.dataset.modelo;
-            document.getElementById("mac").value = btn.dataset.mac;
-            document.getElementById("numberSerial").value = btn.dataset.serial;
-            document.getElementById("fechaCompra").value = btn.dataset.fechacompra;
-            document.getElementById("garantia").value = btn.dataset.garantia;
-            document.getElementById("precioCompra").value = btn.dataset.precio;
-            document.getElementById("antiguedad").value = btn.dataset.antiguedad;
-            document.getElementById("ordenCompra").value = btn.dataset.orden;
-            document.getElementById("estadoGarantia").value = btn.dataset.estadogarantia;
-            document.getElementById("numeroIP").value = btn.dataset.ip;
-            document.getElementById("nombreEquipo").value = btn.dataset.nombreequipo;
-            document.getElementById("observaciones").value = btn.dataset.observaciones;
-            document.getElementById("fecha_entrega").value = btn.dataset.fechaentrega;
+            rellenarDesdeDataset(btn.dataset);
 
-            document.getElementById("id_area").value = btn.dataset.area;
-            document.getElementById("id_persona").value = btn.dataset.persona;
-            document.getElementById("id_usuario").value = btn.dataset.usuario;
-            document.getElementById("id_empresa").value = btn.dataset.empresa;
-            document.getElementById("id_marca").value = btn.dataset.marca;
-            document.getElementById("id_cpu").value = btn.dataset.cpu;
-            document.getElementById("id_ram").value = btn.dataset.ram;
-            document.getElementById("id_storage").value = btn.dataset.storage;
-            document.getElementById("id_estado_activo").value = btn.dataset.estadoactivo;
-            document.getElementById("id_tipo_activo").value = btn.dataset.tipoactivo;
-
-            // Desactivar todos los inputs
             modal.querySelectorAll("input, select, textarea").forEach(el => el.disabled = true);
-            form.querySelector("button[type='submit']").style.display = "none"; // Ocultar botón guardar
+            if (form) {
+                const submitBtn = form.querySelector("button[type='submit']");
+                if (submitBtn) submitBtn.style.display = "none";
+            }
+
+            if (contenedorObs) {
+                contenedorObs.style.display = "block";
+                if (btnToggleObs) btnToggleObs.textContent = "Ocultar";
+            }
+
+            calcularAntiguedad();
+            calcularEstadoGarantia();
 
             modal.style.display = "block";
         });
     });
 
-
-    // === BUSCADOR ===
+    // --- buscador ---
     const buscador = document.getElementById("buscador");
     const filas = document.querySelectorAll("#tablaActivos tbody tr");
-
-    buscador.addEventListener("input", function () {
-        const valor = buscador.value.toLowerCase();
-        filas.forEach(function (fila) {
-            const texto = fila.textContent.toLowerCase();
-            fila.style.display = texto.includes(valor) ? "" : "none";
+    if (buscador) {
+        buscador.addEventListener("input", function () {
+            const valor = buscador.value.toLowerCase();
+            filas.forEach(function (fila) {
+                const texto = fila.textContent.toLowerCase();
+                fila.style.display = texto.includes(valor) ? "" : "none";
+            });
         });
-    });
+    }
 
-    // === VALIDACIONES FINALES ===
-    form.addEventListener("submit", function (e) {
-        const hoy = new Date().toISOString().split("T")[0];
+    // --- filtro personas por área ---
+    function filterPersonasByArea(areaId) {
+        if (!selectPersona) return;
+        Array.from(selectPersona.options).forEach(option => {
+            const optionArea = option.dataset.area || "";
+            const mostrar = String(optionArea) === String(areaId);
+            option.hidden = !mostrar;
+            if (!mostrar && selectPersona.value === option.value) selectPersona.value = "";
+        });
+        const first = Array.from(selectPersona.options).find(o => !o.hidden);
+        if (first && !selectPersona.value) selectPersona.value = first.value;
+    }
 
-        // Verificación final: ¿la persona pertenece al área seleccionada?
-        const selectedArea = document.getElementById("id_area").value;
-        const selectedPersona = parseInt(document.getElementById("id_persona").value);
+    if (selectArea && selectPersona) {
+        if (selectArea.value) filterPersonasByArea(selectArea.value);
+        selectArea.addEventListener("change", function () {
+            filterPersonasByArea(this.value);
+        });
+    }
 
-        if (
-            personasPorArea[selectedArea] &&
-            !personasPorArea[selectedArea].includes(selectedPersona)
-        ) {
-            alert("❌ Error: La persona seleccionada no pertenece al área escogida.");
-            e.preventDefault(); // Evita que el formulario se envíe
-            return;
-        }
-        //
+    // --- validaciones ---
+    if (form) {
+        form.addEventListener("submit", function (e) {
+            const hoy = new Date().toISOString().split("T")[0];
 
-        if (fechaCompraInput.value > hoy) {
-            alert("❌ La fecha de compra no puede ser futura.");
-            e.preventDefault();
-            return;
-        }
+            try {
+                const areaSeleccionada = selectArea ? selectArea.value : null;
+                const personaSeleccionada = selectPersona ? parseInt(selectPersona.value) : null;
 
-        if (garantiaInput.value && garantiaInput.value < fechaCompraInput.value) {
-            alert("❌ La garantía no puede ser anterior a la fecha de compra.");
-            e.preventDefault();
-            return;
-        }
+                if (areaSeleccionada && personaSeleccionada !== null && window.personasPorArea) {
+                    const lista = window.personasPorArea[areaSeleccionada] || window.personasPorArea[String(areaSeleccionada)];
+                    if (lista && !lista.map(String).includes(String(personaSeleccionada))) {
+                        alert("❌ Error: La persona seleccionada no pertenece al área escogida.");
+                        e.preventDefault();
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.warn("Validación área-persona falló:", err);
+            }
 
-        if (precioInput.value && parseFloat(precioInput.value) < 0) {
-            alert("❌ El precio de compra no puede ser negativo.");
-            e.preventDefault();
-            return;
-        }
+            if (fechaCompraInput && fechaCompraInput.value > hoy) {
+                alert("❌ La fecha de compra no puede ser futura.");
+                e.preventDefault();
+                return;
+            }
 
-        if (fechaCompraInput.value && fechaEntregaInput.value && fechaEntregaInput.value < fechaCompraInput.value) {
-            alert("❌ La fecha de entrega no puede ser anterior a la fecha de compra.");
-            e.preventDefault();
-            return;
-        }
+            if (garantiaInput && garantiaInput.value && fechaCompraInput && garantiaInput.value < fechaCompraInput.value) {
+                alert("❌ La garantía no puede ser anterior a la fecha de compra.");
+                e.preventDefault();
+                return;
+            }
 
-        calcularEstadoGarantia();
-    });
-});
+            if (precioInput && precioInput.value && parseFloat(precioInput.value) < 0) {
+                alert("❌ El precio de compra no puede ser negativo.");
+                e.preventDefault();
+                return;
+            }
 
+            if (fechaCompraInput && fechaEntregaInput && fechaEntregaInput.value && fechaCompraInput.value && fechaEntregaInput.value < fechaCompraInput.value) {
+                alert("❌ La fecha de entrega no puede ser anterior a la fecha de compra.");
+                e.preventDefault();
+                return;
+            }
 
-const selectArea = document.getElementById("id_area");
-const selectPersona = document.getElementById("id_persona");
+            calcularEstadoGarantia();
+            calcularAntiguedad();
+        });
+    }
 
-// Al cambiar el área, filtrar personas según su data-area
-selectArea.addEventListener("change", function () {
-    const areaSeleccionada = this.value;
-
-    Array.from(selectPersona.options).forEach(option => {
-        const perteneceArea = option.dataset.area === areaSeleccionada;
-        option.style.display = perteneceArea ? "block" : "none";
-    });
-
-    // Seleccionar el primer valor válido automáticamente si existe
-    const firstValid = Array.from(selectPersona.options).find(opt => opt.style.display === "block");
-    if (firstValid) {
-        selectPersona.value = firstValid.value;
+    // --- aplicar filtro inicial ---
+    if (selectArea && selectPersona && selectArea.value) {
+        filterPersonasByArea(selectArea.value);
     }
 });

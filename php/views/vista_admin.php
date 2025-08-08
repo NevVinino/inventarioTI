@@ -45,9 +45,9 @@ include("../includes/verificar_acceso.php");
             <tr>
                 <td><a href="crud_periferico.php"><img src="../../img/tenor.gif"><p>Crear Periférico</p></a></td>
                 <td><a href="crud_activo.php"><img src="../../img/tenor.gif"><p>Crear Activo</p></a></td>
-                <td><a href="#"><img src="../../img/tenor.gif"><p>Asignaciones</p></a></td>
+                <td><a href="crud_asignacion.php"><img src="../../img/tenor.gif"><p>Asignaciones</p></a></td>
                 <td><a href="#"><img src="../../img/tenor.gif"><p>Reportes</p></a></td>
-                <td><a href="#"><img src="../../img/tenor.gif"><p>Asignaciones</p></a></td>
+                <td><a href="#"><img src="../../img/tenor.gif"><p>Apertura</p></a></td>
             </tr>
         </table>
     </main>

@@ -1,8 +1,15 @@
 <?php
-session_start();
+// Iniciar sesión solo si no hay sesión activa
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Verifica que el usuario haya iniciado sesión
-if (!isset($_SESSION["username"]) || !isset($_SESSION["rol"])) {
+// Verificar que el usuario haya iniciado sesión correctamente
+if (
+    empty($_SESSION["id_usuario"]) ||
+    empty($_SESSION["username"]) ||
+    empty($_SESSION["rol"])
+) {
     header("Location: ../views/iniciarsesion.php?error=no_autenticado");
     exit;
 }
