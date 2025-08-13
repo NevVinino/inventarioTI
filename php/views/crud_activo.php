@@ -93,6 +93,7 @@ $activos = sqlsrv_query($conn, $sql);
     <table id="tablaActivos">
         <thead>
             <tr>
+                <th>N°</th>
                 <th>Nombre Equipo</th>
                 <th>Modelo</th>
                 <th>Serial</th>
@@ -106,19 +107,53 @@ $activos = sqlsrv_query($conn, $sql);
             </tr>
         </thead>
         <tbody>
-            <?php while ($a = sqlsrv_fetch_array($activos, SQLSRV_FETCH_ASSOC)) { ?>
-            <tr>
+            <?php 
+            $counter = 1;
+            while ($a = sqlsrv_fetch_array($activos, SQLSRV_FETCH_ASSOC)) { 
+                $estado_clase = '';
+                switch(strtolower($a['estado'])) {
+                    case 'disponible':
+                        $estado_clase = 'estado-disponible';
+                        break;
+                    case 'asignado':
+                        $estado_clase = 'estado-asignado';
+                        break;
+                    case 'malogrado':
+                        $estado_clase = 'estado-malogrado';
+                        break;
+                }
+            ?>
+            <tr class="<?= $estado_clase ?>">
+                <td><?= $counter++ ?></td>
                 <td><?= htmlspecialchars($a['nombreEquipo'] ?? '') ?></td>
                 <td><?= htmlspecialchars($a['modelo'] ?? '') ?></td>
                 <td><?= htmlspecialchars($a['numberSerial'] ?? '') ?></td>
                 <td><?= htmlspecialchars($a['MAC'] ?? '') ?></td>
                 <td><?= htmlspecialchars($a['numeroIP'] ?? '') ?></td>
-                <td><?= htmlspecialchars($a['estado'] ?? '') ?></td>
+                <td class="estado-celda"><?= htmlspecialchars($a['estado'] ?? '') ?></td>
                 <td><?= htmlspecialchars($a['tipo'] ?? '') ?></td>
                 <td><?= htmlspecialchars($a['marca'] ?? '') ?></td>
                 <td><?= htmlspecialchars($a['asistente'] ?? '') ?></td>
                 <td>
                     <div class="acciones">
+                        <!-- Botón ver -->
+                        <button type="button" class="btn-icon btn-ver" 
+                            data-nombreequipo="<?= htmlspecialchars($a['nombreEquipo'] ?? '') ?>"
+                            data-modelo="<?= htmlspecialchars($a['modelo'] ?? '') ?>"
+                            data-mac="<?= htmlspecialchars($a['MAC'] ?? '') ?>"
+                            data-serial="<?= htmlspecialchars($a['numberSerial'] ?? '') ?>"
+                            data-ip="<?= htmlspecialchars($a['numeroIP'] ?? '') ?>"
+                            data-estado="<?= htmlspecialchars($a['estado'] ?? '') ?>"
+                            data-tipo="<?= htmlspecialchars($a['tipo'] ?? '') ?>"
+                            data-marca="<?= htmlspecialchars($a['marca'] ?? '') ?>"
+                            data-asistente="<?= htmlspecialchars($a['asistente'] ?? '') ?>"
+                            data-cpu="<?= htmlspecialchars($a['cpu'] ?? '') ?>"
+                            data-ram="<?= htmlspecialchars($a['ram'] ?? '') ?>"
+                            data-storage="<?= htmlspecialchars($a['storage'] ?? '') ?>"
+                        >
+                            <img src="../../img/ojo.png" alt="Ver">
+                        </button>
+
                         <!-- Botón editar -->
                         <button type="button" class="btn-icon btn-editar"
                             data-id="<?= htmlspecialchars($a['id_activo']) ?>"
@@ -218,7 +253,7 @@ $activos = sqlsrv_query($conn, $sql);
             <div id="contenedorObservaciones" style="display: none;">
                 <textarea name="observaciones" id="observaciones"></textarea>
             </div>
-
+            <br>
             <?php
             function select($name, $dataset, $id_field, $desc_field, $customLabel = null) {
                 $labelText = $customLabel ?? ucfirst(str_replace('_', ' ', $name));
@@ -245,6 +280,65 @@ $activos = sqlsrv_query($conn, $sql);
             <br>
             <button type="submit">Guardar</button>
         </form>
+    </div>
+</div>
+
+<!-- Modal para ver detalles (agregar antes del script) -->
+<div id="modalVisualizacion" class="modal">
+    <div class="modal-content detalles">
+        <span class="close close-view">&times;</span>
+        <h3>Detalles del Activo</h3>
+        
+        <div class="detalles-grid">
+            <div class="detalle-item">
+                <strong>Nombre del Equipo:</strong>
+                <span id="view-nombreequipo"></span>
+            </div>
+            <div class="detalle-item">
+                <strong>Modelo:</strong>
+                <span id="view-modelo"></span>
+            </div>
+            <div class="detalle-item">
+                <strong>MAC:</strong>
+                <span id="view-mac"></span>
+            </div>
+            <div class="detalle-item">
+                <strong>Serial:</strong>
+                <span id="view-serial"></span>
+            </div>
+            <div class="detalle-item">
+                <strong>IP:</strong>
+                <span id="view-ip"></span>
+            </div>
+            <div class="detalle-item">
+                <strong>Estado:</strong>
+                <span id="view-estado"></span>
+            </div>
+            <div class="detalle-item">
+                <strong>Tipo:</strong>
+                <span id="view-tipo"></span>
+            </div>
+            <div class="detalle-item">
+                <strong>Marca:</strong>
+                <span id="view-marca"></span>
+            </div>
+            <div class="detalle-item">
+                <strong>Asistente:</strong>
+                <span id="view-asistente"></span>
+            </div>
+            <div class="detalle-item">
+                <strong>CPU:</strong>
+                <span id="view-cpu"></span>
+            </div>
+            <div class="detalle-item">
+                <strong>RAM:</strong>
+                <span id="view-ram"></span>
+            </div>
+            <div class="detalle-item">
+                <strong>Almacenamiento:</strong>
+                <span id="view-storage"></span>
+            </div>
+        </div>
     </div>
 </div>
 

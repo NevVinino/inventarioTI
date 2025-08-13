@@ -242,33 +242,37 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // --- ver ---
+    const modalView = document.getElementById('modalVisualizacion');
+    const spanCloseView = document.querySelector('.close-view');
+    
     document.querySelectorAll(".btn-ver").forEach(function (btn) {
         btn.addEventListener("click", function () {
-            if (!modal) return;
-            const modalTitle = document.getElementById("modal-title");
-            if (modalTitle) modalTitle.textContent = "Vista del Activo";
-            const accionField = document.getElementById("accion");
-            if (accionField) accionField.value = "";
-
-            rellenarDesdeDataset(btn.dataset);
-
-            modal.querySelectorAll("input, select, textarea").forEach(el => el.disabled = true);
-            if (form) {
-                const submitBtn = form.querySelector("button[type='submit']");
-                if (submitBtn) submitBtn.style.display = "none";
+            if (!modalView) return;
+            
+            // Llenar datos
+            for (let attr of this.attributes) {
+                if (attr.name.startsWith('data-')) {
+                    const field = attr.name.replace('data-', '');
+                    const span = document.getElementById('view-' + field);
+                    if (span) {
+                        span.textContent = attr.value || 'No especificado';
+                    }
+                }
             }
-
-            if (contenedorObs) {
-                contenedorObs.style.display = "block";
-                if (btnToggleObs) btnToggleObs.textContent = "Ocultar";
-            }
-
-            calcularAntiguedad();
-            calcularEstadoGarantia();
-
-            modal.style.display = "block";
+            
+            modalView.style.display = 'block';
         });
     });
+
+    // Cerrar modal de visualización solo con el botón X
+    if (spanCloseView) {
+        spanCloseView.addEventListener('click', function() {
+            if (modalView) modalView.style.display = 'none';
+        });
+    }
+
+    // Ya no cerraremos el modal al hacer clic fuera
+    // Eliminamos el evento de click en window
 
     // --- buscador ---
     const buscador = document.getElementById("buscador");
@@ -358,3 +362,4 @@ document.addEventListener("DOMContentLoaded", function () {
         filterPersonasByArea(selectArea.value);
     }
 });
+
