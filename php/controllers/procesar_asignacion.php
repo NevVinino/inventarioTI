@@ -159,7 +159,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 sqlsrv_begin_transaction($conn);
                 try {
                     // 1. Verificar si la asignación existe
-                    $sql_check = "SELECT id_asignacion, id_activo FROM asignacion WHERE id_asignacion = ?";
+                    $sql_check = "SELECT id_asignacion, id_activo, id_persona FROM asignacion WHERE id_asignacion = ?";
                     $stmt_check = sqlsrv_query($conn, $sql_check, array($_POST['id_asignacion']));
                     $row = sqlsrv_fetch_array($stmt_check, SQLSRV_FETCH_ASSOC);
                     
@@ -169,16 +169,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     
                     $id_activo = $row['id_activo'];
 
-                    // 2. Verificar si hay asignaciones de periféricos relacionadas
-                    $sql_check_perifericos = "SELECT COUNT(*) as count FROM asignacion_periferico WHERE id_asignacion = ?";
-                    $stmt_check_perifericos = sqlsrv_query($conn, $sql_check_perifericos, array($_POST['id_asignacion']));
-                    $perifericos_count = sqlsrv_fetch_array($stmt_check_perifericos)['count'];
-                    
-                    if ($perifericos_count > 0) {
-                        throw new Exception("No se puede eliminar la asignación porque tiene periféricos asignados");
-                    }
-
-                    // 3. Eliminar la asignación
+                    // 2. Eliminar la asignación
                     $sql_delete = "DELETE FROM asignacion WHERE id_asignacion = ?";
                     $stmt_delete = sqlsrv_query($conn, $sql_delete, array($_POST['id_asignacion']));
 
