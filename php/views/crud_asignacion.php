@@ -39,16 +39,21 @@ $asignaciones = verificar_query(sqlsrv_query($conn, $sqlAsignaciones), $sqlAsign
 $sqlPersonas = "SELECT id_persona, CONCAT(nombre, ' ', apellido) as nombre_completo FROM persona";
 $personas = verificar_query(sqlsrv_query($conn, $sqlPersonas), $sqlPersonas);
 
-$sqlActivos = "SELECT DISTINCT a.id_activo, a.nombreEquipo, a.modelo, CONCAT(a.nombreEquipo, ' - ', a.modelo, ' (', a.numberSerial, ')') as descripcion 
+// Mostrar activos disponibles + activos que están en asignaciones (para permitir edición)
+$sqlActivos = "SELECT DISTINCT a.id_activo, a.nombreEquipo, a.modelo, 
+               CONCAT(a.nombreEquipo, ' - ', a.modelo, ' (', a.numberSerial, ')') as descripcion,
+               ea.vestado_activo
                FROM activo a
+               INNER JOIN estado_activo ea ON a.id_estado_activo = ea.id_estado_activo
                WHERE a.id_estado_activo = (
                    SELECT id_estado_activo 
                    FROM estado_activo 
                    WHERE vestado_activo = 'Disponible'
-               ) 
+               )
                OR a.id_activo IN (
-                   SELECT id_activo 
-                   FROM asignacion
+                   SELECT DISTINCT id_activo 
+                   FROM asignacion 
+                   WHERE fecha_retorno IS NULL
                )
                ORDER BY a.nombreEquipo, a.modelo";
 $activos = verificar_query(sqlsrv_query($conn, $sqlActivos), $sqlActivos);
@@ -220,8 +225,14 @@ $empresas = verificar_query(sqlsrv_query($conn, $sqlEmpresas), $sqlEmpresas);
                             $activos_count = 0;
                             while ($ac = sqlsrv_fetch_array($activos, SQLSRV_FETCH_ASSOC)) { 
                                 $activos_count++;
+                                $disabled = ($ac['vestado_activo'] === 'Asignado') ? 'disabled' : '';
+                                $style = ($ac['vestado_activo'] === 'Asignado') ? 'style="color: #999; background-color: #f5f5f5;"' : '';
+                                $texto = ($ac['vestado_activo'] === 'Asignado') ? htmlspecialchars($ac['descripcion']) . ' (YA ASIGNADO)' : htmlspecialchars($ac['descripcion']);
                             ?>
-                                <option value="<?= $ac['id_activo'] ?>"><?= htmlspecialchars($ac['descripcion']) ?></option>
+                                <option value="<?= $ac['id_activo'] ?>" 
+                                        data-estado="<?= $ac['vestado_activo'] ?>" 
+                                        <?= $disabled ?> 
+                                        <?= $style ?>><?= $texto ?></option>
                             <?php } ?>
                         </select>
                         <!-- Debug: mostrar cantidad de activos cargados -->

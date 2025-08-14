@@ -13,7 +13,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 sqlsrv_begin_transaction($conn);
 
                 try {
-                    // 1. Obtener el ID del estado "Asignado"
+                    // 1. Verificar que el activo esté disponible
+                    $sql_verificar = "SELECT a.id_activo, ea.vestado_activo 
+                                    FROM activo a 
+                                    INNER JOIN estado_activo ea ON a.id_estado_activo = ea.id_estado_activo 
+                                    WHERE a.id_activo = ?";
+                    $stmt_verificar = sqlsrv_query($conn, $sql_verificar, array($_POST['id_activo']));
+                    $activo_info = sqlsrv_fetch_array($stmt_verificar, SQLSRV_FETCH_ASSOC);
+                    
+                    if (!$activo_info) {
+                        throw new Exception("El activo seleccionado no existe");
+                    }
+                    
+                    if ($activo_info['vestado_activo'] !== 'Disponible') {
+                        throw new Exception("El activo seleccionado ya está asignado a otra persona");
+                    }
+                    
+                    // 2. Obtener el ID del estado "Asignado"
                     $sql_estado = "SELECT id_estado_activo FROM estado_activo WHERE vestado_activo = 'Asignado'";
                     $stmt_estado = sqlsrv_query($conn, $sql_estado);
                     $estado_asignado = sqlsrv_fetch_array($stmt_estado)['id_estado_activo'];

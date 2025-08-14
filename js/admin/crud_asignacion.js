@@ -9,6 +9,16 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('modal-title').textContent = 'Crear nueva Asignación';
         formAsignacion.reset();
         formAsignacion.accion.value = 'crear';
+        
+        // Deshabilitar activos ya asignados para nuevas asignaciones
+        const activoSelect = document.getElementById('id_activo');
+        for (let i = 0; i < activoSelect.options.length; i++) {
+            const option = activoSelect.options[i];
+            if (option.dataset.estado === 'Asignado') {
+                option.disabled = true;
+            }
+        }
+        
         modal.style.display = 'block';
     }
 
@@ -28,35 +38,29 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('modal-title').textContent = 'Editar Asignación';
             document.getElementById('id_asignacion').value = this.dataset.id;
             document.getElementById('id_persona').value = this.dataset.idPersona;
-            // Establecer el valor del activo y verificar que se seleccione correctamente
-            const activoSelect = document.getElementById('id_activo');
-            activoSelect.value = this.dataset.idActivo;
             
-            // Verificar si el valor se estableció correctamente
-            if (activoSelect.value !== this.dataset.idActivo) {
-                console.log('Error: No se pudo establecer el valor del activo');
-                console.log('Valor esperado:', this.dataset.idActivo);
-                console.log('Valor actual:', activoSelect.value);
-                
-                // Intentar establecer el valor usando selectedIndex
-                for (let i = 0; i < activoSelect.options.length; i++) {
-                    if (activoSelect.options[i].value === this.dataset.idActivo) {
-                        activoSelect.selectedIndex = i;
-                        console.log('Valor establecido usando selectedIndex:', activoSelect.value);
-                        break;
-                    }
+            // Para edición: habilitar el activo actual aunque esté asignado, deshabilitar otros asignados
+            const activoSelect = document.getElementById('id_activo');
+            const activoActualId = this.dataset.idActivo;
+            
+            for (let i = 0; i < activoSelect.options.length; i++) {
+                const option = activoSelect.options[i];
+                if (option.dataset.estado === 'Asignado') {
+                    // Solo habilitar el activo actual, deshabilitar otros asignados
+                    option.disabled = (option.value !== activoActualId);
+                } else {
+                    // Habilitar activos disponibles
+                    option.disabled = false;
                 }
             }
+            
+            document.getElementById('id_activo').value = this.dataset.idActivo;
             document.getElementById('id_area').value = this.dataset.idArea;
             document.getElementById('id_empresa').value = this.dataset.idEmpresa;
             document.getElementById('fecha_asignacion').value = this.dataset.fechaAsignacion;
             document.getElementById('fecha_retorno').value = this.dataset.fechaRetorno || '';
             document.getElementById('observaciones').value = this.dataset.observaciones;
             document.getElementById('accion').value = 'editar';
-            
-            // Debug: verificar que el valor del activo se estableció correctamente
-            console.log('ID Activo:', this.dataset.idActivo);
-            console.log('Valor del select activo:', document.getElementById('id_activo').value);
             
             modal.style.display = 'block';
         }
