@@ -28,13 +28,36 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('modal-title').textContent = 'Editar Asignación';
             document.getElementById('id_asignacion').value = this.dataset.id;
             document.getElementById('id_persona').value = this.dataset.idPersona;
-            document.getElementById('id_activo').value = this.dataset.idActivo; // Asegurarse que coincida con el data-id-activo
+            // Establecer el valor del activo y verificar que se seleccione correctamente
+            const activoSelect = document.getElementById('id_activo');
+            activoSelect.value = this.dataset.idActivo;
+            
+            // Verificar si el valor se estableció correctamente
+            if (activoSelect.value !== this.dataset.idActivo) {
+                console.log('Error: No se pudo establecer el valor del activo');
+                console.log('Valor esperado:', this.dataset.idActivo);
+                console.log('Valor actual:', activoSelect.value);
+                
+                // Intentar establecer el valor usando selectedIndex
+                for (let i = 0; i < activoSelect.options.length; i++) {
+                    if (activoSelect.options[i].value === this.dataset.idActivo) {
+                        activoSelect.selectedIndex = i;
+                        console.log('Valor establecido usando selectedIndex:', activoSelect.value);
+                        break;
+                    }
+                }
+            }
             document.getElementById('id_area').value = this.dataset.idArea;
             document.getElementById('id_empresa').value = this.dataset.idEmpresa;
             document.getElementById('fecha_asignacion').value = this.dataset.fechaAsignacion;
             document.getElementById('fecha_retorno').value = this.dataset.fechaRetorno || '';
             document.getElementById('observaciones').value = this.dataset.observaciones;
             document.getElementById('accion').value = 'editar';
+            
+            // Debug: verificar que el valor del activo se estableció correctamente
+            console.log('ID Activo:', this.dataset.idActivo);
+            console.log('Valor del select activo:', document.getElementById('id_activo').value);
+            
             modal.style.display = 'block';
         }
     });
@@ -68,6 +91,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         fetch(this.action, {
             method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
             body: new FormData(this)
         })
         .then(response => response.json())
@@ -94,6 +120,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (confirm('¿Está seguro de eliminar esta asignación?')) {
                     fetch(this.action, {
                         method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
                         body: new FormData(this)
                     })
                     .then(response => response.json())

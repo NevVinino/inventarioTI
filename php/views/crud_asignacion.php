@@ -39,17 +39,18 @@ $asignaciones = verificar_query(sqlsrv_query($conn, $sqlAsignaciones), $sqlAsign
 $sqlPersonas = "SELECT id_persona, CONCAT(nombre, ' ', apellido) as nombre_completo FROM persona";
 $personas = verificar_query(sqlsrv_query($conn, $sqlPersonas), $sqlPersonas);
 
-$sqlActivos = "SELECT id_activo, CONCAT(nombreEquipo, ' - ', modelo, ' (', numberSerial, ')') as descripcion 
-               FROM activo 
-               WHERE id_estado_activo = (
+$sqlActivos = "SELECT DISTINCT a.id_activo, a.nombreEquipo, a.modelo, CONCAT(a.nombreEquipo, ' - ', a.modelo, ' (', a.numberSerial, ')') as descripcion 
+               FROM activo a
+               WHERE a.id_estado_activo = (
                    SELECT id_estado_activo 
                    FROM estado_activo 
                    WHERE vestado_activo = 'Disponible'
                ) 
-               OR id_activo IN (
+               OR a.id_activo IN (
                    SELECT id_activo 
                    FROM asignacion
-               )";
+               )
+               ORDER BY a.nombreEquipo, a.modelo";
 $activos = verificar_query(sqlsrv_query($conn, $sqlActivos), $sqlActivos);
 
 $sqlAreas = "SELECT id_area, nombre FROM area";
@@ -63,6 +64,33 @@ $empresas = verificar_query(sqlsrv_query($conn, $sqlEmpresas), $sqlEmpresas);
     <head>
         <title>Gestión de Asignaciones</title>
         <link rel="stylesheet" href="../../css/admin/crud_usuarios.css">
+        <style>
+            .alerta-error {
+                background-color: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+                padding: 12px 20px;
+                margin: 20px auto;
+                width: 80%;
+                text-align: center;
+                border-radius: 5px;
+                font-weight: bold;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            }
+            
+            .alerta-exito {
+                background-color: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+                padding: 12px 20px;
+                margin: 20px auto;
+                width: 80%;
+                text-align: center;
+                border-radius: 5px;
+                font-weight: bold;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            }
+        </style>
     </head>
     <body>
         <header>
@@ -75,13 +103,42 @@ $empresas = verificar_query(sqlsrv_query($conn, $sqlEmpresas), $sqlEmpresas);
             </div>
         </header>
 
-        <a href="vista_admin.php" class="back-button">
-            <img src="../../img/flecha-atras.png" alt="Atrás"> Atrás
-        </a>
+            <!-- Alerta de errores y éxito -->
+    <?php if (isset($_GET['error'])): ?>
+        <div class="alerta-error" id="mensajeError">
+            <?= htmlspecialchars($_GET['error']) ?>
+        </div>
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                setTimeout(() => {
+                    const alerta = document.getElementById("mensajeError");
+                    if (alerta) alerta.style.display = "none";
+                }, 5000);
+            });
+        </script>
+    <?php endif; ?>
+    
+    <?php if (isset($_GET['success'])): ?>
+        <div class="alerta-exito" id="mensajeExito">
+            Operación realizada exitosamente.
+        </div>
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                setTimeout(() => {
+                    const alerta = document.getElementById("mensajeExito");
+                    if (alerta) alerta.style.display = "none";
+                }, 3000);
+            });
+        </script>
+    <?php endif; ?>
+
+    <a href="vista_admin.php" class="back-button">
+        <img src="../../img/flecha-atras.png" alt="Atrás"> Atrás
+    </a>
 
         <div class="main-container">
             <div class="top-bar">
-                <h2>Asignaciones</h2>
+                <h2>Asignaciones de Activos</h2>
                 <input type="text" id="buscador" placeholder="Busca en la tabla">
                 <button id="btnNuevo">+ Nueva Asignación</button>
             </div>
@@ -159,10 +216,16 @@ $empresas = verificar_query(sqlsrv_query($conn, $sqlEmpresas), $sqlEmpresas);
                         <label>Activo:</label>
                         <select name="id_activo" id="id_activo" required>
                             <option value="">Seleccione un activo</option>
-                            <?php while ($ac = sqlsrv_fetch_array($activos, SQLSRV_FETCH_ASSOC)) { ?>
+                            <?php 
+                            $activos_count = 0;
+                            while ($ac = sqlsrv_fetch_array($activos, SQLSRV_FETCH_ASSOC)) { 
+                                $activos_count++;
+                            ?>
                                 <option value="<?= $ac['id_activo'] ?>"><?= htmlspecialchars($ac['descripcion']) ?></option>
                             <?php } ?>
                         </select>
+                        <!-- Debug: mostrar cantidad de activos cargados -->
+                        <script>console.log('Activos cargados: <?= $activos_count ?>');</script>
 
                         <label>Área:</label>
                         <select name="id_area" id="id_area" required>
