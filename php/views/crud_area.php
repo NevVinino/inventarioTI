@@ -93,15 +93,18 @@ $areas = sqlsrv_query($conn, $sqlAreas);
         <table id="tablaAreas">
             <thead>
                 <tr>
+                    <th>N°</th>
                     <th>Nombre</th>                
                     <th>Acciones</th>
                 </tr>
             </thead>
 
             <tbody>
+                <?php $counter = 1; ?>
                 <?php while ($u = sqlsrv_fetch_array($areas, SQLSRV_FETCH_ASSOC)) { ?>
                 
                 <tr>
+                    <td><?= $counter++ ?></td>
                     <td><?= $u['nombre'] ?></td>
                     <td>
                         <div class="acciones">

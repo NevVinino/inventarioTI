@@ -42,13 +42,16 @@ $localidades = sqlsrv_query($conn, $sqlLocalidades);
         <table id=tablaLocalidades>
             <thead>
                 <tr>
+                    <th>N°</th>
                     <th>Nombre de la Localidad</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
+                <?php $counter = 1; ?>
                 <?php while ($u = sqlsrv_fetch_array($localidades, SQLSRV_FETCH_ASSOC)) { ?>
                     <tr>
+                        <td><?= $counter++ ?></td>
                         <td><?= $u["localidad_nombre"] ?></td>
                         <td>
                             <div class="acciones">

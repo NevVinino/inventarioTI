@@ -20,12 +20,13 @@ $sqlAsignacionesPerifericos = "SELECT
     ap.fecha_asignacion,
     ap.observaciones,
     CONCAT(p.nombre, ' ', p.apellido) as nombre_persona,
-    CONCAT(tp.vtipo_periferico, ' - ', m.nombre) as descripcion_periferico
+    CONCAT(tp.vtipo_periferico, ' - ', m.nombre, ' - ', cp.vcondicion_periferico) as descripcion_periferico
     FROM asignacion_periferico ap
     INNER JOIN persona p ON ap.id_persona = p.id_persona
     INNER JOIN periferico per ON ap.id_periferico = per.id_periferico
     INNER JOIN tipo_periferico tp ON per.id_tipo_periferico = tp.id_tipo_periferico
     INNER JOIN marca m ON per.id_marca = m.id_marca
+    INNER JOIN condicion_periferico cp ON per.id_condicion_periferico = cp.id_condicion_periferico
     ORDER BY ap.fecha_asignacion DESC";
 
 $asignacionesPerifericos = verificar_query(sqlsrv_query($conn, $sqlAsignacionesPerifericos), $sqlAsignacionesPerifericos);
@@ -129,6 +130,7 @@ $perifericos = verificar_query(sqlsrv_query($conn, $sqlPerifericos), $sqlPerifer
                                          <table id="tablaAsignacionesPerifericos">
                  <thead>
                      <tr>
+                        <th>N°</th>
                          <th>Persona</th>
                          <th>Periférico</th>
                          <th>Fecha Asignación</th>
@@ -138,8 +140,10 @@ $perifericos = verificar_query(sqlsrv_query($conn, $sqlPerifericos), $sqlPerifer
                  </thead>
 
                  <tbody>
+                    <?php $counter = 1; ?>
                      <?php while ($ap = sqlsrv_fetch_array($asignacionesPerifericos, SQLSRV_FETCH_ASSOC)) { ?>
                      <tr>
+                         <td><?= $counter++ ?></td>
                          <td><?= htmlspecialchars($ap['nombre_persona']) ?></td>
                          <td><?= htmlspecialchars($ap['descripcion_periferico']) ?></td>
                          <td><?= $ap['fecha_asignacion'] ? $ap['fecha_asignacion']->format('d/m/Y') : '-' ?></td>

@@ -38,6 +38,7 @@ $rams = sqlsrv_query($conn, $sqlRams);
             <table id="tablaRams">
                 <thead>
                     <tr>
+                        <th>N°</th>
                         <th>Capacidad</th>
                         <th>Marca</th>                        
                         <th>Acciones</th>
@@ -45,8 +46,10 @@ $rams = sqlsrv_query($conn, $sqlRams);
                 </thead>
 
                 <tbody>
+                    <?php $counter = 1; ?>
                     <?php while ($u = sqlsrv_fetch_array($rams, SQLSRV_FETCH_ASSOC)) { ?>
                         <tr>
+                            <td><?= $counter++ ?></td>
                             <td><?= $u["capacidad"] ?></td>
                             <td><?= $u["marca"] ?></td>
                             <td>

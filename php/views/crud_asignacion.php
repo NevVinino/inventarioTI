@@ -151,6 +151,7 @@ $empresas = verificar_query(sqlsrv_query($conn, $sqlEmpresas), $sqlEmpresas);
             <table id="tablaAsignaciones">
                 <thead>
                     <tr>
+                        <th>N°</th>
                         <th>Persona</th>
                         <th>Activo</th>
                         <th>Área</th>
@@ -163,8 +164,10 @@ $empresas = verificar_query(sqlsrv_query($conn, $sqlEmpresas), $sqlEmpresas);
                     </tr>
                 </thead>
                 <tbody>
+                    <?php $counter = 1; ?>
                     <?php while ($a = sqlsrv_fetch_array($asignaciones, SQLSRV_FETCH_ASSOC)) { ?>
                         <tr>
+                            <td><?= $counter++ ?></td>
                             <td><?= htmlspecialchars($a["nombre_persona"]) ?></td>
                             <td><?= htmlspecialchars($a["nombre_activo"]) ?></td>
                             <td><?= htmlspecialchars($a["nombre_area"]) ?></td>

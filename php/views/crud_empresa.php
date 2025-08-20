@@ -39,13 +39,16 @@ $empresas = sqlsrv_query($conn, $sqlEmpresas);
         <table id="tablaEmpresas">
             <thead>
                 <tr>
+                    <th>N°</th>
                     <th>Nombre de la Empresa</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
+                <?php $counter = 1; ?>
                 <?php while ($u = sqlsrv_fetch_array($empresas, SQLSRV_FETCH_ASSOC)) { ?>
                     <tr>
+                        <td><?= $counter++ ?></td>
                         <td><?= $u["nombre"] ?></td>
                         <td>
                             <div class="acciones">

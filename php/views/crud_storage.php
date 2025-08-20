@@ -38,6 +38,7 @@ $storages = sqlsrv_query($conn, $sqlStorages);
             <table id="tablaStorages">
                 <thead>
                     <tr>
+                        <th>N°</th>
                         <th>Capacidad</th>
                         <th>Tipo</th>
                         <th>Marca</th>
@@ -46,8 +47,10 @@ $storages = sqlsrv_query($conn, $sqlStorages);
                 </thead>
 
                 <tbody>
+                    <?php $counter = 1; ?>
                     <?php while ($u = sqlsrv_fetch_array($storages, SQLSRV_FETCH_ASSOC)) { ?>
                         <tr>
+                            <td><?= $counter++ ?></td>
                             <td><?= $u["capacidad"] ?></td>
                             <td><?= $u["tipo"] ?></td>
                             <td><?= $u["marca"] ?></td>

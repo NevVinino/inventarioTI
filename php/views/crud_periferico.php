@@ -52,6 +52,7 @@ $perifericos = sqlsrv_query($conn, $sql);
         <table id="tablaPerifericos">
             <thead>
                 <tr>
+                    <th>N°</th>
                     <th>Tipo</th>
                     <th>Marca</th>
                     <th>Condición</th>
@@ -59,8 +60,10 @@ $perifericos = sqlsrv_query($conn, $sql);
                 </tr>
             </thead>
             <tbody>
+             <?php $counter = 1; ?>
                 <?php while ($p = sqlsrv_fetch_array($perifericos, SQLSRV_FETCH_ASSOC)) { ?>
                     <tr>
+                        <td><?= $counter++ ?></td>
                         <td><?= htmlspecialchars($p["vtipo_periferico"]) ?></td>
                         <td><?= htmlspecialchars($p["marca"]) ?></td>
                         <td><?= htmlspecialchars($p["vcondicion_periferico"]) ?></td>

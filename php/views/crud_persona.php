@@ -73,6 +73,7 @@ $jefes = sqlsrv_query($conn, "
     <table id="tablaPersonas">
         <thead>
             <tr>
+                <th>N°</th>
                 <th>Nombre</th>
                 <th>Apellido</th>
                 <th>Correo</th>
@@ -87,8 +88,10 @@ $jefes = sqlsrv_query($conn, "
             </tr>
         </thead>
         <tbody>
+            <?php $counter = 1; ?>
             <?php while ($p = sqlsrv_fetch_array($personas, SQLSRV_FETCH_ASSOC)) { ?>
             <tr>
+                <td><?= $counter++ ?></td>
                 <td><?= htmlspecialchars($p['nombre']) ?></td>
                 <td><?= htmlspecialchars($p['apellido']) ?></td>
                 <td><?= htmlspecialchars($p['correo']) ?></td>

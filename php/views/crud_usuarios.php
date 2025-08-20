@@ -50,6 +50,7 @@ $usuarios = sqlsrv_query($conn, $sqlUsuarios);
         <table id="tablaUsuarios">
             <thead>
                 <tr>
+                    <th>N°</th>
                     <th>Usuario</th>
                     <th>Rol</th>
                     <th>Estado</th>
@@ -57,8 +58,10 @@ $usuarios = sqlsrv_query($conn, $sqlUsuarios);
                 </tr>
             </thead>
             <tbody>
+                <?php $counter = 1; ?>
                 <?php while ($u = sqlsrv_fetch_array($usuarios, SQLSRV_FETCH_ASSOC)) { ?>
                 <tr>
+                    <td><?= $counter++ ?></td>
                     <td><?= $u['username'] ?></td>
                     <td><?= $u['rol'] ?></td>
                     <td><?= $u['vestado_usuario'] ?></td>

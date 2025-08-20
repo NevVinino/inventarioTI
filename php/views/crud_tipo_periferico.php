@@ -37,14 +37,17 @@ $tiposPerifericos = sqlsrv_query($conn, $sqlTiposperifericos);
             <table id="tablaTiposPerifericos">
                 <thead>
                     <tr>
+                        <th>N°</th>
                         <th>Tipo de Periférico</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
 
                 <tbody>
+                    <?php $counter = 1; ?>
                     <?php while ($u = sqlsrv_fetch_array($tiposPerifericos, SQLSRV_FETCH_ASSOC)) { ?>
                         <tr>
+                            <td><?= $counter++ ?></td>
                             <td><?= htmlspecialchars($u["vtipo_periferico"]) ?></td>
                             <td>
                                 <div class="acciones">

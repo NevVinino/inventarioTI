@@ -40,6 +40,7 @@ $cpus = sqlsrv_query($conn, $sqlCpus);
             <table id="tablaCpus">
                 <thead>
                     <tr>
+                        <th>N°</th>
                         <th>Descripción</th>
                         <th>Marca</th>
                         <th>Generación</th>
@@ -48,8 +49,10 @@ $cpus = sqlsrv_query($conn, $sqlCpus);
                 </thead>
 
                 <tbody>
+                    <?php $counter = 1; ?>
                     <?php while ($u = sqlsrv_fetch_array($cpus, SQLSRV_FETCH_ASSOC)) { ?>
                         <tr>
+                            <td><?= $counter++ ?></td>
                             <td><?= $u["descripcion"] ?></td>
                             <td><?= $u["marca"] ?></td>
                             <td><?= $u["generacion"] ?></td>

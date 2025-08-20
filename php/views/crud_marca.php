@@ -37,14 +37,17 @@ $marcas = sqlsrv_query($conn, $sqlMarcas);
             <table id="tablaMarcas">
                 <thead>
                     <tr>
+                        <th>N°</th>
                         <th>Nombre</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
 
                 <tbody>
+                    <?php $counter = 1; ?>
                     <?php while ($u = sqlsrv_fetch_array($marcas, SQLSRV_FETCH_ASSOC)) { ?>
                         <tr>
+                            <td><?= $counter++ ?></td>
                             <td><?= htmlspecialchars($u["nombre"]) ?></td>
                             <td>
                                 <div class="acciones">
