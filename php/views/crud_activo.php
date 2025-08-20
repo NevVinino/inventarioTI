@@ -46,7 +46,7 @@ $activos = sqlsrv_query($conn, $sql);
 <head>
     <meta charset="UTF-8">
     <title>Gestión de Activos</title>
-    <link rel="stylesheet" href="../../css/admin/crud_usuarios.css">
+    <link rel="stylesheet" href="../../css/admin/crud_admin.css">
 </head>
 <body>
 
@@ -116,7 +116,8 @@ $activos = sqlsrv_query($conn, $sql);
                     // Generar QR solo si no existe el archivo
                     if (!file_exists("../../" . $qr_path)) {
                         include_once __DIR__ . '/../../phpqrcode/qrlib.php';
-                        $url_qr = "https://inventario-ti.app/activo.php?id=" . $a['id_activo'];
+                        // La URL que se codificará en el QR - Considera usar una URL absoluta
+                        $url_qr = "../views/user/detalle_activo.php?id=" . $a['id_activo'];
                         QRcode::png($url_qr, "../../" . $qr_path, QR_ECLEVEL_H, 10);
                         
                         // Actualizar la ruta en la base de datos
@@ -182,14 +183,16 @@ $activos = sqlsrv_query($conn, $sql);
                             <img src="../../img/editar.png" alt="Editar">
                         </button>
 
-                        <!-- Botón eliminar -->
-                        <form method="POST" action="../controllers/procesar_activo.php" onsubmit="return confirm('¿Eliminar este activo?');">
-                            <input type="hidden" name="accion" value="eliminar">
-                            <input type="hidden" name="id_activo" value="<?= htmlspecialchars($a['id_activo']) ?>">
-                            <button type="submit" class="btn-icon">
-                                <img src="../../img/eliminar.png" alt="Eliminar">
-                            </button>
-                        </form>
+                        <?php if (strtolower($a['estado']) !== 'asignado'): ?>
+                            <!-- Botón eliminar (solo visible si no está asignado) -->
+                            <form method="POST" action="../controllers/procesar_activo.php" onsubmit="return confirm('¿Eliminar este activo?');">
+                                <input type="hidden" name="accion" value="eliminar">
+                                <input type="hidden" name="id_activo" value="<?= htmlspecialchars($a['id_activo']) ?>">
+                                <button type="submit" class="btn-icon">
+                                    <img src="../../img/eliminar.png" alt="Eliminar">
+                                </button>
+                            </form>
+                        <?php endif; ?>
                     </div>
                 </td>
             </tr>
@@ -260,6 +263,8 @@ $activos = sqlsrv_query($conn, $sql);
             <?php
             function select($name, $dataset, $id_field, $desc_field, $customLabel = null) {
                 $labelText = $customLabel ?? ucfirst(str_replace('_', ' ', $name));
+                $isEstadoActivo = $name === 'id_estado_activo';
+                
                 echo "<label>$labelText:</label>";
                 echo "<select name='$name' id='$name' required>";
                 if ($dataset) {

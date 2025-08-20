@@ -19,13 +19,21 @@ $sql = "SELECT p.id_periferico,
         JOIN condicion_periferico cp ON p.id_condicion_periferico = cp.id_condicion_periferico";
 
 $perifericos = sqlsrv_query($conn, $sql);
+
+// Verificar si el periférico está asignado antes de mostrar el botón de eliminar
+function estaAsignado($conn, $id_periferico) {
+    $sql = "SELECT COUNT(*) as total FROM asignacion_periferico WHERE id_periferico = ?";
+    $stmt = sqlsrv_query($conn, $sql, [$id_periferico]);
+    $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+    return $row['total'] > 0;
+}
 ?>
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <title>Gestión de Periféricos</title>
-    <link rel="stylesheet" href="../../css/admin/crud_usuarios.css">
+    <link rel="stylesheet" href="../../css/admin/crud_admin.css">
 </head>
 <body>
     <header>
@@ -76,7 +84,8 @@ $perifericos = sqlsrv_query($conn, $sql);
                                     data-condicion="<?= $p['vcondicion_periferico'] ?>">
                                     <img src="../../img/editar.png" alt="Editar">
                                 </button>
-                                <form method="POST" action="../controllers/procesar_periferico.php" onsubmit="return confirm('¿Eliminar este periférico?');">
+                                <form method="POST" action="../controllers/procesar_periferico.php" 
+                                      onsubmit="return confirm('¿Eliminar este periférico?');">
                                     <input type="hidden" name="accion" value="eliminar">
                                     <input type="hidden" name="id_periferico" value="<?= $p['id_periferico'] ?>">
                                     <button type="submit" class="btn-icon">
@@ -130,5 +139,7 @@ $perifericos = sqlsrv_query($conn, $sql);
     </div>
 
     <script src="../../js/admin/crud_periferico.js"></script>
+</body>
+</html>
 </body>
 </html>

@@ -12,7 +12,7 @@ $marcas = sqlsrv_query($conn, $sqlMarcas);
 <html>
     <head>
         <title>Gestión de Marcas</title>
-        <link rel="stylesheet" href="../../css/admin/crud_usuarios.css">
+        <link rel="stylesheet" href="../../css/admin/crud_admin.css">
     </head> 
     <body>
         <header>

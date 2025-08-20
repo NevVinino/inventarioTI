@@ -23,7 +23,7 @@ $usuarios = sqlsrv_query($conn, $sqlUsuarios);
 <head>
     <meta charset="UTF-8">
     <title>Gestión de Usuarios</title>
-    <link rel="stylesheet" href="../../css/admin/crud_usuarios.css">
+    <link rel="stylesheet" href="../../css/admin/crud_admin.css">
 </head>
 <body>
     <header>

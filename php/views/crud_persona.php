@@ -46,7 +46,7 @@ $jefes = sqlsrv_query($conn, "
 <head>
     <meta charset="UTF-8">
     <title>Gestión de Personas</title>
-    <link rel="stylesheet" href="../../css/admin/crud_usuarios.css">
+    <link rel="stylesheet" href="../../css/admin/crud_admin.css">
 </head>
 <body>
 <header>

@@ -2,6 +2,28 @@
 session_start();
 include("../includes/conexion.php");
 
+// Agregar endpoint para verificación de asignación
+if ($_SERVER["REQUEST_METHOD"] === "GET" && isset($_GET['verificar_asignacion'])) {
+    $id_activo = $_GET['id_activo'] ?? null;
+    if ($id_activo) {
+        $sql = "SELECT TOP 1 1 as asignado 
+                FROM asignacion 
+                WHERE id_activo = ? 
+                AND (fecha_retorno IS NULL OR fecha_retorno > GETDATE())";
+        
+        $stmt = sqlsrv_query($conn, $sql, [$id_activo]);
+        $resultado = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+        
+        header('Content-Type: application/json');
+        echo json_encode(['asignado' => !empty($resultado)]);
+        exit;
+    }
+    header('HTTP/1.1 400 Bad Request');
+    echo json_encode(['error' => 'No se proporcionó ID de activo']);
+    exit;
+}
+
+// Procesar POST requests (código original)
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $accion = $_POST["accion"] ?? '';
     $id_activo = $_POST["id_activo"] ?? '';
@@ -93,7 +115,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             
             if ($id_activo_nuevo) {
                 include_once __DIR__ . '/../../phpqrcode/qrlib.php';
-                $url_qr = "https://inventario-ti.app/activo.php?id=" . $id_activo_nuevo;
+                // La URL que se codificará en el QR - Considera usar una URL absoluta
+                $url_qr = "../views/user/detalle_activo.php?id=" . $id_activo_nuevo;
                 $qr_filename = "activo_" . $id_activo_nuevo . ".png";
                 $qr_path = "img/qr/" . $qr_filename;
                 

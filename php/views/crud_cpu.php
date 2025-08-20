@@ -13,7 +13,7 @@ $cpus = sqlsrv_query($conn, $sqlCpus);
 <html>
     <head>
         <title>Gestión de CPU</title>
-        <link rel="stylesheet" href="../../css/admin/crud_usuarios.css">
+        <link rel="stylesheet" href="../../css/admin/crud_admin.css">
     </head> 
     <body>
         <header>

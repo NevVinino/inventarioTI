@@ -52,7 +52,7 @@ $perifericos = verificar_query(sqlsrv_query($conn, $sqlPerifericos), $sqlPerifer
 <head>
     <meta charset="UTF-8">
     <title>CRUD de Asignaciones de Periféricos</title>
-    <link rel="stylesheet" href="../../css/admin/crud_usuarios.css">
+    <link rel="stylesheet" href="../../css/admin/crud_admin.css">
     <style>
         .alerta-error {
             background-color: #f8d7da;

@@ -12,7 +12,7 @@ $rams = sqlsrv_query($conn, $sqlRams);
 <html>
     <head>
         <title>Gestión de RAM</title>
-        <link rel="stylesheet" href="../../css/admin/crud_usuarios.css">
+        <link rel="stylesheet" href="../../css/admin/crud_admin.css">
     </head> 
     <body>
         <header>

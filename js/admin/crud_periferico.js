@@ -65,4 +65,46 @@ document.addEventListener("DOMContentLoaded", function () {
             fila.style.display = texto.includes(valor) ? "" : "none";
         });
     });
+
+    // Verificar mensajes de error en la URL
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('error') === 'en_uso') {
+        alert('❌ No se puede eliminar el periférico porque está siendo utilizado en una asignación. Primero debe desasignar el periférico.');
+    }
+
+    // Interceptar SOLO los formularios de eliminación
+    document.querySelectorAll('form[action*="procesar_periferico.php"]').forEach(form => {
+        // Solo interceptar si es un formulario de eliminación
+        if (form.querySelector('input[name="accion"][value="eliminar"]')) {
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                if (!confirm('¿Está seguro que desea eliminar este periférico?')) {
+                    return;
+                }
+
+                const formData = new FormData(this);
+                
+                try {
+                    const response = await fetch(this.action, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.text();
+                    
+                    if (data.includes('error=en_uso')) {
+                        alert('❌ No se puede eliminar el periférico porque está siendo utilizado en una asignación. Primero debe desasignar el periférico.');
+                    } else if (data.includes('success=1')) {
+                        location.reload();
+                    } else {
+                        alert('Ocurrió un error al procesar la solicitud.');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Error al procesar la solicitud.');
+                }
+            });
+        }
+    });
 });

@@ -214,30 +214,53 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // --- editar ---
     document.querySelectorAll(".btn-editar").forEach(function (btn) {
-        btn.addEventListener("click", function () {
+        btn.addEventListener("click", async function () {
             if (!modal) return;
+            
+            // Primero habilitar todo para evitar problemas con campos previos
+            modal.querySelectorAll("input, select, textarea").forEach(el => el.disabled = false);
+
             const modalTitle = document.getElementById("modal-title");
             if (modalTitle) modalTitle.textContent = "Editar Activo";
+            
             const accionField = document.getElementById("accion");
             if (accionField) accionField.value = "editar";
 
-            rellenarDesdeDataset(btn.dataset);
+            // Verificar asignación antes de rellenar datos
+            const idActivo = btn.dataset.id;
+            try {
+                const response = await fetch(`../controllers/procesar_activo.php?verificar_asignacion=1&id_activo=${idActivo}`);
+                const data = await response.json();
+                
+                // Rellenar datos después de verificar
+                rellenarDesdeDataset(btn.dataset);
 
-            modal.querySelectorAll("input, select, textarea").forEach(el => el.disabled = false);
-            if (form) {
-                const submitBtn = form.querySelector("button[type='submit']");
-                if (submitBtn) submitBtn.style.display = "block";
+                const estadoSelect = document.getElementById('id_estado_activo');
+                if (estadoSelect && data.asignado) {
+                    estadoSelect.disabled = true;
+                    
+                    // Agregar campo oculto para mantener el valor
+                    if (!document.querySelector('input[name="id_estado_activo"][type="hidden"]')) {
+                        const hiddenInput = document.createElement('input');
+                        hiddenInput.type = 'hidden';
+                        hiddenInput.name = 'id_estado_activo';
+                        hiddenInput.value = btn.dataset.estadoactivo;
+                        estadoSelect.parentNode.appendChild(hiddenInput);
+                    }
+
+                    // Mensaje visual
+                    const mensajeEstado = document.createElement('div');
+                    mensajeEstado.style.color = 'red';
+                    mensajeEstado.style.fontSize = '12px';
+                    mensajeEstado.textContent = 'Este activo está asignado. No se puede cambiar su estado.';
+                    estadoSelect.parentNode.appendChild(mensajeEstado);
+                }
+
+            } catch (error) {
+                console.error('Error al verificar asignación:', error);
             }
 
-            if (contenedorObs) contenedorObs.style.display = "block";
-            if (btnToggleObs) btnToggleObs.textContent = "Ocultar";
-
-            calcularAntiguedad();
-            calcularEstadoGarantia();
-
             modal.style.display = "block";
-            const firstInput = modal.querySelector("input:not([type=hidden]), select, textarea");
-            if (firstInput) try { firstInput.focus(); } catch (e) {}
         });
     });
 

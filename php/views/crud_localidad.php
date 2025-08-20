@@ -15,7 +15,7 @@ $localidades = sqlsrv_query($conn, $sqlLocalidades);
 <html>
 <head>
     <title>Gestión de Localidad</title>
-    <link rel="stylesheet" href="../../css/admin/crud_usuarios.css">
+    <link rel="stylesheet" href="../../css/admin/crud_admin.css">
 </head>
 <body>
     <header>

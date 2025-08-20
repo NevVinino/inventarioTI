@@ -68,7 +68,7 @@ $empresas = verificar_query(sqlsrv_query($conn, $sqlEmpresas), $sqlEmpresas);
 <html>
     <head>
         <title>Gestión de Asignaciones</title>
-        <link rel="stylesheet" href="../../css/admin/crud_usuarios.css">
+        <link rel="stylesheet" href="../../css/admin/crud_admin.css">
         <style>
             .alerta-error {
                 background-color: #f8d7da;

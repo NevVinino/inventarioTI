@@ -17,7 +17,7 @@ $areas = sqlsrv_query($conn, $sqlAreas);
 <head>
     <meta charset="UTF-8">
     <title>CRUD de Área</title>
-     <link rel="stylesheet" href="../../css/admin/crud_usuarios.css">
+     <link rel="stylesheet" href="../../css/admin/crud_admin.css">
         <style>
             .alerta-error {
                 background-color: #f8d7da;

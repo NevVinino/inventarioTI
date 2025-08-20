@@ -12,7 +12,7 @@ $empresas = sqlsrv_query($conn, $sqlEmpresas);
 <html>
 <head>
     <title>Gestión de Empresas</title>
-    <link rel="stylesheet" href="../../css/admin/crud_usuarios.css">
+    <link rel="stylesheet" href="../../css/admin/crud_admin.css">
 </head>
 <body>
     <header>
