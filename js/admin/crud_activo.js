@@ -255,7 +255,19 @@ document.addEventListener("DOMContentLoaded", function () {
                     const field = attr.name.replace('data-', '');
                     const span = document.getElementById('view-' + field);
                     if (span) {
-                        span.textContent = attr.value || 'No especificado';
+                        if (field === 'qr') {
+                            const qrPath = attr.value;
+                            span.innerHTML = `<img src="../../${qrPath}" alt="QR Code" style="width: 200px;">`;
+                            
+                            // Configurar botón de descarga
+                            const downloadBtn = document.getElementById('download-qr');
+                            if (downloadBtn) {
+                                downloadBtn.href = "../../" + qrPath;
+                                downloadBtn.download = qrPath.split('/').pop(); // Obtiene solo el nombre del archivo
+                            }
+                        } else {
+                            span.textContent = attr.value || 'No especificado';
+                        }
                     }
                 }
             }
@@ -361,5 +373,17 @@ document.addEventListener("DOMContentLoaded", function () {
     if (selectArea && selectPersona && selectArea.value) {
         filterPersonasByArea(selectArea.value);
     }
-});
 
+    // Clic en el icono/imagen de QR de la tabla
+    document.querySelectorAll(".logo-qr").forEach(img => {
+        img.addEventListener("click", () => {
+            if (!modalView) return;
+            const idActivo = img.dataset.id;
+            if (!idActivo) return;
+
+            const qrPath = `../../img/qr/activo_${idActivo}.png`;
+            if (viewImgQR) viewImgQR.src = qrPath;
+            modalView.style.display = "block";
+        });
+    });
+});

@@ -85,6 +85,27 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             die(print_r(sqlsrv_errors(), true));
         }
 
+        // Obtener ID del nuevo activo y generar QR
+        $sql_id = "SELECT SCOPE_IDENTITY() as id";
+        $stmt_id = sqlsrv_query($conn, $sql_id);
+        if ($stmt_id && $row = sqlsrv_fetch_array($stmt_id, SQLSRV_FETCH_ASSOC)) {
+            $id_activo_nuevo = $row['id'];
+            
+            if ($id_activo_nuevo) {
+                include_once __DIR__ . '/../../phpqrcode/qrlib.php';
+                $url_qr = "https://inventario-ti.app/activo.php?id=" . $id_activo_nuevo;
+                $qr_filename = "activo_" . $id_activo_nuevo . ".png";
+                $qr_path = "img/qr/" . $qr_filename;
+                
+                QRcode::png($url_qr, "../../" . $qr_path, QR_ECLEVEL_H, 10);
+                
+                // Guardar información en la tabla qr_activo
+                $sql_qr = "INSERT INTO qr_activo (id_activo, ruta_qr) VALUES (?, ?)";
+                $params_qr = [$id_activo_nuevo, $qr_path];
+                sqlsrv_query($conn, $sql_qr, $params_qr);
+            }
+        }
+
     } elseif ($accion === "editar" && !empty($id_activo)) {
         $sql_activo = "UPDATE activo SET
             nombreEquipo = ?, modelo = ?, MAC = ?, numberSerial = ?, fechaCompra = ?, garantia = ?, 
@@ -121,6 +142,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         }
 
     } elseif ($accion === "eliminar" && !empty($id_activo)) {
+        // Eliminar QR si existe
+        $sql_qr = "SELECT ruta_qr FROM qr_activo WHERE id_activo = ?";
+        $stmt_qr = sqlsrv_query($conn, $sql_qr, [$id_activo]);
+        if ($stmt_qr && $row = sqlsrv_fetch_array($stmt_qr, SQLSRV_FETCH_ASSOC)) {
+            $qr_file = "../../" . $row['ruta_qr'];
+            if (file_exists($qr_file)) {
+                unlink($qr_file);
+            }
+        }
+
+        // Eliminar registros
+        sqlsrv_query($conn, "DELETE FROM qr_activo WHERE id_activo = ?", [$id_activo]);
         $del1 = sqlsrv_query($conn, "DELETE FROM asignacion WHERE id_activo = ?", [$id_activo]);
         $del2 = sqlsrv_query($conn, "DELETE FROM activo WHERE id_activo = ?", [$id_activo]);
         if ($del1 === false || $del2 === false) {

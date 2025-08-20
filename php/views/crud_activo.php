@@ -19,33 +19,15 @@ $marcas = sqlsrv_query($conn, "SELECT id_marca, nombre FROM marca");
 // Lista de activos
 $sql = "
 SELECT 
-    a.id_activo,
-    a.nombreEquipo,
-    a.modelo,
-    a.MAC,
-    a.numberSerial,
-    a.fechaCompra,
-    a.garantia,
-    a.precioCompra,
-    a.antiguedad,
-    a.ordenCompra,
-    a.estadoGarantia,
-    a.numeroIP,
-    a.observaciones,
-    a.id_cpu,
-    a.id_ram,
-    a.id_storage,
-    a.id_estado_activo,
-    a.id_tipo_activo,
-    a.id_marca,
-    a.id_usuario,
+    a.*,
     c.descripcion AS cpu,
     r.capacidad AS ram,
     s.capacidad AS storage,
     ea.vestado_activo AS estado,
     ta.vtipo_activo AS tipo,
     m.nombre AS marca,
-    u.username AS asistente
+    u.username AS asistente,
+    q.ruta_qr
 FROM activo a
 LEFT JOIN cpu c ON a.id_cpu = c.id_cpu
 LEFT JOIN ram r ON a.id_ram = r.id_ram
@@ -54,6 +36,7 @@ LEFT JOIN estado_activo ea ON a.id_estado_activo = ea.id_estado_activo
 LEFT JOIN tipo_activo ta ON a.id_tipo_activo = ta.id_tipo_activo
 LEFT JOIN marca m ON a.id_marca = m.id_marca
 LEFT JOIN usuario u ON a.id_usuario = u.id_usuario
+LEFT JOIN qr_activo q ON a.id_activo = q.id_activo
 ";
 $activos = sqlsrv_query($conn, $sql);
 ?>
@@ -90,6 +73,7 @@ $activos = sqlsrv_query($conn, $sql);
         <button id="btnNuevo">+ NUEVO</button>
     </div>
 
+    <!-- Modificar la tabla para incluir columna QR -->
     <table id="tablaActivos">
         <thead>
             <tr>
@@ -108,7 +92,7 @@ $activos = sqlsrv_query($conn, $sql);
         </thead>
         <tbody>
             <?php 
-            $counter = 1;
+            $counter = 1; // Añadir esta línea para inicializar el contador
             while ($a = sqlsrv_fetch_array($activos, SQLSRV_FETCH_ASSOC)) { 
                 $estado_clase = '';
                 switch(strtolower($a['estado'])) {
@@ -121,6 +105,24 @@ $activos = sqlsrv_query($conn, $sql);
                     case 'malogrado':
                         $estado_clase = 'estado-malogrado';
                         break;
+                }
+
+                // Usar la ruta de QR existente o generarla si no existe
+                $qr_path = $a['ruta_qr'];
+                
+                if (!$qr_path) {
+                    $qr_path = "img/qr/activo_" . $a['id_activo'] . ".png";
+                    
+                    // Generar QR solo si no existe el archivo
+                    if (!file_exists("../../" . $qr_path)) {
+                        include_once __DIR__ . '/../../phpqrcode/qrlib.php';
+                        $url_qr = "https://inventario-ti.app/activo.php?id=" . $a['id_activo'];
+                        QRcode::png($url_qr, "../../" . $qr_path, QR_ECLEVEL_H, 10);
+                        
+                        // Actualizar la ruta en la base de datos
+                        $sql_qr = "INSERT INTO qr_activo (id_activo, ruta_qr) VALUES (?, ?)";
+                        sqlsrv_query($conn, $sql_qr, [$a['id_activo'], $qr_path]);
+                    }
                 }
             ?>
             <tr class="<?= $estado_clase ?>">
@@ -136,7 +138,7 @@ $activos = sqlsrv_query($conn, $sql);
                 <td><?= htmlspecialchars($a['asistente'] ?? '') ?></td>
                 <td>
                     <div class="acciones">
-                        <!-- Botón ver -->
+                        <!-- Botón ver (modificar para incluir data-qr) -->
                         <button type="button" class="btn-icon btn-ver" 
                             data-nombreequipo="<?= htmlspecialchars($a['nombreEquipo'] ?? '') ?>"
                             data-modelo="<?= htmlspecialchars($a['modelo'] ?? '') ?>"
@@ -150,6 +152,7 @@ $activos = sqlsrv_query($conn, $sql);
                             data-cpu="<?= htmlspecialchars($a['cpu'] ?? '') ?>"
                             data-ram="<?= htmlspecialchars($a['ram'] ?? '') ?>"
                             data-storage="<?= htmlspecialchars($a['storage'] ?? '') ?>"
+                            data-qr="<?= $qr_path ?>"
                         >
                             <img src="../../img/ojo.png" alt="Ver">
                         </button>
@@ -337,6 +340,13 @@ $activos = sqlsrv_query($conn, $sql);
             <div class="detalle-item">
                 <strong>Almacenamiento:</strong>
                 <span id="view-storage"></span>
+            </div>
+            <div class="detalle-item qr-container">
+                <strong>Código QR:</strong>
+                <div id="view-qr"></div>
+                <a id="download-qr" href="#" download class="btn-download">
+                    Descargar QR
+                </a>
             </div>
         </div>
     </div>

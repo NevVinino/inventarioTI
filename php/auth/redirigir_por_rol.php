@@ -11,7 +11,7 @@ switch ($_SESSION["rol"]) {
         header("Location: ../views/vista_admin.php");
         break;
     case "user":
-        header("Location: ../views/vista_user.php");
+        header("Location: ../views/user/vista_user.php");
         break;
     default:
         header("Location: ../views/iniciarsesion.php?error=rol_no_valido");

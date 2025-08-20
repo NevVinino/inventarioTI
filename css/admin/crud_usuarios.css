@@ -333,3 +333,20 @@ textarea#observaciones {
     color: #dc3545;
     font-weight: bold;
 }
+
+/* BOTON DE DESCARGAR QR EN MODAL VISUALIZACION DEL ACTIVO (crud_activo.php)*/
+
+.btn-download {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 8px 15px;
+    background-color: #4CAF50;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.btn-download:hover {
+    background-color: #45a049;
+}

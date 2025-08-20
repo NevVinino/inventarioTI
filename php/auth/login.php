@@ -26,7 +26,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     header("Location: ../views/vista_admin.php");
                     exit;
                 } elseif ($row["rol"] === "user") {
-                    header("Location: ../views/vista_user.php");
+                    header("Location: ../views/user/vista_user.php");
                     exit;
                 }
             } else {
