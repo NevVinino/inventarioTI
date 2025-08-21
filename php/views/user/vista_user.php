@@ -20,7 +20,16 @@ include("../../includes/verificar_acceso.php");
     </header>
     
     <main>
-        <!-- Aquí irán las funcionalidades del usuario común -->
+        <div class="qr-simulator">
+            <h2>Simulador de Escaneo QR</h2>
+            <form action="detalle_activo.php" method="GET">
+                <div class="form-group">
+                    <label for="id">Ingrese ID del Activo:</label>
+                    <input type="number" id="id" name="id" required min="1">
+                </div>
+                <button type="submit">Ver Detalles</button>
+            </form>
+        </div>
     </main>
 </body>
 </html>

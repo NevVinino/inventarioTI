@@ -3,6 +3,8 @@ include("../includes/conexion.php");
 $solo_admin = true;
 include("../includes/verificar_acceso.php");
 
+// Define la URL base del sistema
+define('BASE_URL', 'http://localhost:8000');
 
 // Recuperar datos de sesión
 $id_usuario_sesion = $_SESSION['id_usuario'] ?? '';
@@ -117,7 +119,7 @@ $activos = sqlsrv_query($conn, $sql);
                     if (!file_exists("../../" . $qr_path)) {
                         include_once __DIR__ . '/../../phpqrcode/qrlib.php';
                         // La URL que se codificará en el QR - Considera usar una URL absoluta
-                        $url_qr = "../views/user/detalle_activo.php?id=" . $a['id_activo'];
+                        $url_qr = BASE_URL . "/php/views/user/detalle_activo.php?id=" . $a['id_activo'];
                         QRcode::png($url_qr, "../../" . $qr_path, QR_ECLEVEL_H, 10);
                         
                         // Actualizar la ruta en la base de datos
