@@ -35,15 +35,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $estado_asignado = sqlsrv_fetch_array($stmt_estado)['id_estado_activo'];
 
                     // 2. Insertar la asignación
-                    $sql_asignacion = "INSERT INTO asignacion (id_activo, id_persona, id_area, id_empresa, 
+                    $sql_asignacion = "INSERT INTO asignacion (id_activo, id_persona, 
                                      fecha_asignacion, fecha_retorno, observaciones, id_usuario) 
-                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                                     VALUES (?, ?, ?, ?, ?, ?)";
                     
                     $params_asignacion = array(
                         $_POST['id_activo'],
                         $_POST['id_persona'],
-                        $_POST['id_area'],
-                        $_POST['id_empresa'],
                         $_POST['fecha_asignacion'],
                         $_POST['fecha_retorno'] ?: null,
                         $_POST['observaciones'],
@@ -76,22 +74,38 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 break;
 
             case 'editar':
-                // Iniciar transacción
                 sqlsrv_begin_transaction($conn);
 
                 try {
-                    // Obtener el activo anterior antes de actualizar
-                    $sql_get_old_activo = "SELECT id_activo FROM asignacion WHERE id_asignacion = ?";
-                    $stmt_get_old = sqlsrv_query($conn, $sql_get_old_activo, array($_POST['id_asignacion']));
-                    $old_activo = sqlsrv_fetch_array($stmt_get_old)['id_activo'];
+                    // Debug
+                    error_log("Editando asignación: " . print_r($_POST, true));
+
+                    // Validar datos requeridos
+                    if (!isset($_POST['id_asignacion']) || !isset($_POST['id_persona']) || 
+                        !isset($_POST['id_activo']) || !isset($_POST['fecha_asignacion'])) {
+                        throw new Exception("Faltan datos requeridos para la edición");
+                    }
+
+                    // Obtener el activo anterior
+                    $sql_get_old = "SELECT id_activo FROM asignacion WHERE id_asignacion = ?";
+                    $stmt_get_old = sqlsrv_query($conn, $sql_get_old, array($_POST['id_asignacion']));
+                    
+                    if ($stmt_get_old === false) {
+                        throw new Exception("Error al obtener la asignación actual: " . print_r(sqlsrv_errors(), true));
+                    }
+                    
+                    $row = sqlsrv_fetch_array($stmt_get_old, SQLSRV_FETCH_ASSOC);
+                    if (!$row) {
+                        throw new Exception("No se encontró la asignación a editar");
+                    }
+                    
+                    $old_activo = $row['id_activo'];
                     $new_activo = $_POST['id_activo'];
 
                     // Actualizar la asignación
                     $sql_update = "UPDATE asignacion 
                                  SET id_persona = ?, 
                                      id_activo = ?,
-                                     id_area = ?, 
-                                     id_empresa = ?, 
                                      fecha_asignacion = ?, 
                                      fecha_retorno = ?, 
                                      observaciones = ?
@@ -99,75 +113,59 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     
                     $params_update = array(
                         $_POST['id_persona'],
-                        $_POST['id_activo'],
-                        $_POST['id_area'],
-                        $_POST['id_empresa'],
+                        $new_activo,
                         $_POST['fecha_asignacion'],
-                        $_POST['fecha_retorno'] ?: null,
+                        !empty($_POST['fecha_retorno']) ? $_POST['fecha_retorno'] : null,
                         $_POST['observaciones'],
                         $_POST['id_asignacion']
                     );
 
                     $stmt_update = sqlsrv_query($conn, $sql_update, $params_update);
                     if ($stmt_update === false) {
-                        throw new Exception("Error al actualizar la asignación");
+                        throw new Exception("Error al actualizar la asignación: " . print_r(sqlsrv_errors(), true));
                     }
 
-                    // Si se cambió el activo, actualizar los estados
+                    // Solo actualizar estados si cambió el activo
                     if ($old_activo != $new_activo) {
-                        // Obtener IDs de estados
-                        $sql_estados = "SELECT id_estado_activo, vestado_activo FROM estado_activo WHERE vestado_activo IN ('Disponible', 'Asignado')";
+                        $sql_estados = "SELECT id_estado_activo, vestado_activo 
+                                      FROM estado_activo 
+                                      WHERE vestado_activo IN ('Disponible', 'Asignado')";
                         $stmt_estados = sqlsrv_query($conn, $sql_estados);
                         $estados = array();
                         while ($row = sqlsrv_fetch_array($stmt_estados)) {
                             $estados[$row['vestado_activo']] = $row['id_estado_activo'];
                         }
 
-                        // Marcar el activo anterior como disponible
-                        $sql_update_old = "UPDATE activo SET id_estado_activo = ? WHERE id_activo = ?";
-                        $stmt_update_old = sqlsrv_query($conn, $sql_update_old, array($estados['Disponible'], $old_activo));
+                        // Actualizar estados de los activos
+                        $sql_update_estados = "UPDATE activo 
+                                            SET id_estado_activo = CASE 
+                                                WHEN id_activo = ? THEN ?
+                                                WHEN id_activo = ? THEN ?
+                                                ELSE id_estado_activo 
+                                            END
+                                            WHERE id_activo IN (?, ?)";
                         
-                        if ($stmt_update_old === false) {
-                            throw new Exception("Error al actualizar el estado del activo anterior");
-                        }
+                        $params_estados = array(
+                            $old_activo, $estados['Disponible'],
+                            $new_activo, $estados['Asignado'],
+                            $old_activo, $new_activo
+                        );
 
-                        // Marcar el nuevo activo como asignado
-                        $sql_update_new = "UPDATE activo SET id_estado_activo = ? WHERE id_activo = ?";
-                        $stmt_update_new = sqlsrv_query($conn, $sql_update_new, array($estados['Asignado'], $new_activo));
-                        
-                        if ($stmt_update_new === false) {
-                            throw new Exception("Error al actualizar el estado del nuevo activo");
-                        }
-                    }
-
-                    // Si hay fecha de retorno, actualizar el estado del activo a "Disponible"
-                    if (!empty($_POST['fecha_retorno'])) {
-                        $sql_estado = "SELECT id_estado_activo FROM estado_activo WHERE vestado_activo = 'Disponible'";
-                        $stmt_estado = sqlsrv_query($conn, $sql_estado);
-                        $estado_disponible = sqlsrv_fetch_array($stmt_estado)['id_estado_activo'];
-
-                        // Obtener el id_activo de la asignación
-                        $sql_activo = "SELECT id_activo FROM asignacion WHERE id_asignacion = ?";
-                        $stmt_activo = sqlsrv_query($conn, $sql_activo, array($_POST['id_asignacion']));
-                        $id_activo = sqlsrv_fetch_array($stmt_activo)['id_activo'];
-
-                        // Actualizar el estado del activo
-                        $sql_update_activo = "UPDATE activo SET id_estado_activo = ? WHERE id_activo = ?";
-                        $stmt_update_activo = sqlsrv_query($conn, $sql_update_activo, array($estado_disponible, $id_activo));
-                        
-                        if ($stmt_update_activo === false) {
-                            throw new Exception("Error al actualizar el estado del activo");
+                        $stmt_update_estados = sqlsrv_query($conn, $sql_update_estados, $params_estados);
+                        if ($stmt_update_estados === false) {
+                            throw new Exception("Error al actualizar estados de los activos: " . print_r(sqlsrv_errors(), true));
                         }
                     }
 
-                    // Confirmar transacción
                     sqlsrv_commit($conn);
                     $respuesta['success'] = true;
                     $respuesta['message'] = 'Asignación actualizada exitosamente';
 
                 } catch (Exception $e) {
                     sqlsrv_rollback($conn);
-                    throw $e;
+                    error_log("Error en edición: " . $e->getMessage());
+                    $respuesta['success'] = false;
+                    $respuesta['message'] = $e->getMessage();
                 }
                 break;
 
@@ -242,5 +240,3 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 header('Location: ../views/crud_asignacion.php');
 exit;
-
-

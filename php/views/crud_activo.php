@@ -17,6 +17,7 @@ $storages = sqlsrv_query($conn, "SELECT id_storage, capacidad + ' - ' + tipo + '
 $estados = sqlsrv_query($conn, "SELECT id_estado_activo, vestado_activo FROM estado_activo");
 $tipos_activo = sqlsrv_query($conn, "SELECT id_tipo_activo, vtipo_activo FROM tipo_activo");
 $marcas = sqlsrv_query($conn, "SELECT id_marca, nombre FROM marca");
+$empresas = sqlsrv_query($conn, "SELECT id_empresa, nombre FROM empresa"); // Consulta para empresas
 
 // Lista de activos
 $sql = "
@@ -279,6 +280,7 @@ $activos = sqlsrv_query($conn, $sql);
                 echo "</select>";
             }
 
+            select("id_empresa", $empresas, "id_empresa", "nombre", "Empresa"); // Select para empresas
             select("id_marca", $marcas, "id_marca", "nombre");
             select("id_cpu", $cpus, "id_cpu", "descripcion");
             select("id_ram", $rams, "id_ram", "descripcion");

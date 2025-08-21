@@ -24,12 +24,17 @@ SELECT
     ea.vestado_activo AS estado,
     ta.vtipo_activo AS tipo,
     m.nombre AS marca,
-    u.username AS asistente,
-    CASE 
-        WHEN asi.id_asignacion IS NOT NULL THEN 
-            p.nombre + ' ' + p.apellido + ' (' + ar.nombre + ' - ' + e.nombre + ')'
-        ELSE 'No asignado'
-    END AS asignado_a
+    u.username AS usuario_registro,
+    u2.username AS usuario_asignacion,
+    p.nombre AS persona_nombre,
+    p.apellido AS persona_apellido,
+    p.id_area,
+    ar.nombre AS area_nombre,
+    emp.nombre AS empresa_persona,
+    emp_activo.nombre AS empresa_activo,
+    asi.fecha_asignacion,
+    asi.fecha_retorno,
+    asi.observaciones AS obs_asignacion
 FROM activo a
 LEFT JOIN cpu c ON a.id_cpu = c.id_cpu
 LEFT JOIN ram r ON a.id_ram = r.id_ram
@@ -37,11 +42,13 @@ LEFT JOIN storage s ON a.id_storage = s.id_storage
 LEFT JOIN estado_activo ea ON a.id_estado_activo = ea.id_estado_activo
 LEFT JOIN tipo_activo ta ON a.id_tipo_activo = ta.id_tipo_activo
 LEFT JOIN marca m ON a.id_marca = m.id_marca
+LEFT JOIN empresa emp_activo ON a.id_empresa = emp_activo.id_empresa
 LEFT JOIN usuario u ON a.id_usuario = u.id_usuario
 LEFT JOIN asignacion asi ON a.id_activo = asi.id_activo AND (asi.fecha_retorno IS NULL OR asi.fecha_retorno > GETDATE())
+LEFT JOIN usuario u2 ON asi.id_usuario = u2.id_usuario
 LEFT JOIN persona p ON asi.id_persona = p.id_persona
-LEFT JOIN area ar ON asi.id_area = ar.id_area
-LEFT JOIN empresa e ON asi.id_empresa = e.id_empresa
+LEFT JOIN area ar ON p.id_area = ar.id_area
+LEFT JOIN empresa emp ON p.id_empresa = emp.id_empresa
 WHERE a.id_activo = ?";
 
 $stmt = sqlsrv_query($conn, $sql, [$id_activo]);
@@ -55,6 +62,30 @@ $activo = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
 if (!$activo) {
     die("Activo no encontrado en la base de datos. ID: " . htmlspecialchars($id_activo));
 }
+
+// Función para calcular la antigüedad en formato legible
+function calcularAntiguedadLegible($dias) {
+    if (!$dias) return 'No especificado';
+    
+    $años = floor($dias / 365);
+    $meses = floor(($dias % 365) / 30);
+    $diasRestantes = $dias % 30;
+    
+    $partes = [];
+    if ($años > 0) {
+        $partes[] = $años . ' año' . ($años > 1 ? 's' : '');
+    }
+    if ($meses > 0) {
+        $partes[] = $meses . ' mes' . ($meses > 1 ? 'es' : '');
+    }
+    if ($diasRestantes > 0 || empty($partes)) {
+        $partes[] = $diasRestantes . ' día' . ($diasRestantes != 1 ? 's' : '');
+    }
+    
+    return implode(', ', $partes);
+}
+
+$antiguedadLegible = calcularAntiguedadLegible($activo['antiguedad']);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -79,14 +110,54 @@ if (!$activo) {
 
         <div class="container">
             <div class="header">
-                <h1 class="title">Información del Activo</h1>
+                <h1 class="title">Información General del Activo</h1>
             </div>
 
-            <div class="section-title">Información General</div>
+            <div class="section-title">Detalles de Asignación</div>
 
             <div class="detalle">
-                <span class="label">Asistente TI:</span>
-                <span class="value"><?= htmlspecialchars($activo['asistente'] ?? 'No especificado') ?></span>
+                <span class="label">Asistente TI registro asignación:</span>
+                <span class="value"><?= htmlspecialchars($activo['usuario_asignacion'] ?? 'No asignado') ?></span>
+            </div>
+
+            <div class="detalle">
+                <span class="label">Persona Asignada:</span>
+                <span class="value">
+                    <?= htmlspecialchars($activo['persona_nombre'] ?? '') ?> 
+                    <?= htmlspecialchars($activo['persona_apellido'] ?? '') ?>
+                </span>
+            </div>
+
+            <div class="detalle">
+                <span class="label">Área de la Persona:</span>
+                <span class="value"><?= htmlspecialchars($activo['area_nombre'] ?? 'No especificado') ?></span>
+            </div>
+
+            <div class="detalle">
+                <span class="label">Empresa de la Persona:</span>
+                <span class="value"><?= htmlspecialchars($activo['empresa_persona'] ?? 'No especificado') ?></span>
+            </div>
+
+            <div class="detalle">
+                <span class="label">Fecha de Asignación:</span>
+                <span class="value"><?= $activo['fecha_asignacion'] ? $activo['fecha_asignacion']->format('d/m/Y') : 'No asignado' ?></span>
+            </div>
+
+            <div class="detalle">
+                <span class="label">Fecha de Retorno:</span>
+                <span class="value"><?= $activo['fecha_retorno'] ? $activo['fecha_retorno']->format('d/m/Y') : 'Sin retorno programado' ?></span>
+            </div>
+
+            <div class="detalle">
+                <span class="label">Observaciones de Asignación:</span>
+                <span class="value"><?= htmlspecialchars($activo['obs_asignacion'] ?? 'Sin observaciones') ?></span>
+            </div>
+
+            <div class="section-title">Información del Activo</div>
+            
+            <div class="detalle">
+                <span class="label">Activo registrado por Asistente TI:</span>
+                <span class="value"><?= htmlspecialchars($activo['usuario_registro'] ?? 'No especificado') ?></span>
             </div>
 
             <div class="detalle">
@@ -95,15 +166,15 @@ if (!$activo) {
             </div>
 
             <div class="detalle">
+                <span class="label">Empresa del Activo:</span>
+                <span class="value"><?= htmlspecialchars($activo['empresa_activo'] ?? 'No especificado') ?></span>
+            </div>
+
+            <div class="detalle">
                 <span class="label">Estado:</span>
                 <span class="estado estado-<?= strtolower($activo['estado']) ?>">
                     <?= htmlspecialchars($activo['estado']) ?>
                 </span>
-            </div>
-
-            <div class="detalle">
-                <span class="label">Asignado a:</span>
-                <span class="value"><?= htmlspecialchars($activo['asignado_a']) ?></span>
             </div>
 
             <div class="detalle">
@@ -143,6 +214,11 @@ if (!$activo) {
                 <span class="value"><?= htmlspecialchars($activo['numeroIP'] ?? 'No especificado') ?></span>
             </div>
 
+            <div class="detalle">
+                <span class="label">Observaciones del activo:</span>
+                <span class="value observaciones"><?= nl2br(htmlspecialchars($activo['observaciones'] ?? 'Sin observaciones')) ?></span>
+            </div>
+
             <div class="section-title">Detalles de Compra</div>
             <div class="detalle">
                 <span class="label">Fecha de Compra:</span>
@@ -177,12 +253,15 @@ if (!$activo) {
                 <span class="value"><?= htmlspecialchars($activo['antiguedad'] ?? 'No especificado') ?></span>
             </div>
 
-            <div class="section-title">Observaciones</div>
             <div class="detalle">
-                <span class="label">Notas:</span>
-                <span class="value observaciones"><?= nl2br(htmlspecialchars($activo['observaciones'] ?? 'Sin observaciones')) ?></span>
+                <span class="label">Antigüedad:</span>
+                <span class="value antiguedad-legible"><?= $antiguedadLegible ?></span>
             </div>
+
+
         </div>
     </body>
+
 </html>
+
 

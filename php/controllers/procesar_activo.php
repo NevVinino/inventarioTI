@@ -53,6 +53,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $id_storage = (isset($_POST["id_storage"]) && $_POST["id_storage"] !== '') ? $_POST["id_storage"] : null;
         $id_estado_activo = (isset($_POST["id_estado_activo"]) && $_POST["id_estado_activo"] !== '') ? $_POST["id_estado_activo"] : null;
         $id_tipo_activo = (isset($_POST["id_tipo_activo"]) && $_POST["id_tipo_activo"] !== '') ? $_POST["id_tipo_activo"] : null;
+        $id_empresa = (isset($_POST["id_empresa"]) && $_POST["id_empresa"] !== '') ? $_POST["id_empresa"] : null;
 
         if (in_array($accion, ['crear', 'editar'])) {
             if ($fechaCompra && $fechaCompra > date('Y-m-d')) {
@@ -77,8 +78,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $sql_activo = "INSERT INTO activo (
             nombreEquipo, modelo, MAC, numberSerial, fechaCompra, garantia, 
             precioCompra, antiguedad, ordenCompra, estadoGarantia, 
-            numeroIP, observaciones, id_cpu, id_ram, id_storage, id_estado_activo, id_tipo_activo, id_marca, id_usuario
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            numeroIP, observaciones, id_cpu, id_ram, id_storage, id_estado_activo, 
+            id_tipo_activo, id_marca, id_usuario, id_empresa
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         $params_activo = [
             $nombreEquipo,
@@ -99,7 +101,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $id_estado_activo,
             $id_tipo_activo,
             $id_marca,
-            $id_usuario
+            $id_usuario,
+            $id_empresa
         ];
 
         $stmt_activo = sqlsrv_query($conn, $sql_activo, $params_activo);
@@ -133,7 +136,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $sql_activo = "UPDATE activo SET
             nombreEquipo = ?, modelo = ?, MAC = ?, numberSerial = ?, fechaCompra = ?, garantia = ?, 
             precioCompra = ?, antiguedad = ?, ordenCompra = ?, estadoGarantia = ?, 
-            numeroIP = ?, observaciones = ?, id_cpu = ?, id_ram = ?, id_storage = ?, id_estado_activo = ?, id_tipo_activo = ?, id_marca = ?, id_usuario = ?
+            numeroIP = ?, observaciones = ?, id_cpu = ?, id_ram = ?, id_storage = ?, 
+            id_estado_activo = ?, id_tipo_activo = ?, id_marca = ?, id_usuario = ?, id_empresa = ?
         WHERE id_activo = ?";
 
         $params_activo = [
@@ -156,6 +160,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $id_tipo_activo,
             $id_marca,
             $id_usuario,
+            $id_empresa,
             $id_activo
         ];
 

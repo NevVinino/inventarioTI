@@ -35,28 +35,23 @@ document.addEventListener('DOMContentLoaded', function() {
     // Manejador para botones de editar
     document.querySelectorAll('.btn-editar').forEach(btn => {
         btn.onclick = function() {
+            console.log('Datos del botón:', this.dataset); // Debug
             document.getElementById('modal-title').textContent = 'Editar Asignación';
             document.getElementById('id_asignacion').value = this.dataset.id;
             document.getElementById('id_persona').value = this.dataset.idPersona;
             
-            // Para edición: habilitar el activo actual aunque esté asignado, deshabilitar otros asignados
+            // Para edición: habilitar el activo actual aunque esté asignado
             const activoSelect = document.getElementById('id_activo');
             const activoActualId = this.dataset.idActivo;
             
             for (let i = 0; i < activoSelect.options.length; i++) {
                 const option = activoSelect.options[i];
-                if (option.dataset.estado === 'Asignado') {
-                    // Solo habilitar el activo actual, deshabilitar otros asignados
-                    option.disabled = (option.value !== activoActualId);
-                } else {
-                    // Habilitar activos disponibles
+                if (option.value === activoActualId) {
                     option.disabled = false;
                 }
             }
             
-            document.getElementById('id_activo').value = this.dataset.idActivo;
-            document.getElementById('id_area').value = this.dataset.idArea;
-            document.getElementById('id_empresa').value = this.dataset.idEmpresa;
+            document.getElementById('id_activo').value = activoActualId;
             document.getElementById('fecha_asignacion').value = this.dataset.fechaAsignacion;
             document.getElementById('fecha_retorno').value = this.dataset.fechaRetorno || '';
             document.getElementById('observaciones').value = this.dataset.observaciones;
@@ -89,9 +84,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Agregar manejo del formulario de creación/edición
+    // Modificar el manejo del formulario
     formAsignacion.onsubmit = function(e) {
         e.preventDefault();
+        console.log('Enviando formulario...', new FormData(this)); // Debug
         
         fetch(this.action, {
             method: 'POST',
@@ -102,15 +98,16 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
+            console.log('Respuesta:', data); // Debug
             if (data.success) {
                 modal.style.display = 'none';
-                window.location.reload(); // Recargar para ver los cambios
+                window.location.reload();
             } else {
-                alert(data.message); // Solo mostrar alerta si hay error
+                alert(data.message || 'Error al procesar la solicitud');
             }
         })
         .catch(error => {
-            console.error('Error:', error);
+            console.error('Error detallado:', error);
             alert('Ocurrió un error al procesar la solicitud');
         });
     };

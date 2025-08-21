@@ -171,6 +171,10 @@ header h1 {
     white-space: pre-line;
     line-height: 1.5;
 }
+.antiguedad-legible {
+    color: #34495e;
+    font-weight: 500;
+}
 /* Responsive */
 @media (max-width: 768px) {
     .container {

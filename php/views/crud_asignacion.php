@@ -16,21 +16,15 @@ $sqlAsignaciones = "SELECT
     a.id_asignacion, 
     CONCAT(p.nombre, ' ', p.apellido) as nombre_persona,
     CONCAT(ac.nombreEquipo, ' - ', ac.modelo) as nombre_activo,
-    ar.nombre as nombre_area, 
-    e.nombre as nombre_empresa,
     a.fecha_asignacion,
     a.fecha_retorno,
     a.observaciones,
     u.username as asignado_por,
     a.id_persona,
-    a.id_activo,
-    a.id_area,
-    a.id_empresa
+    a.id_activo
     FROM asignacion a
     INNER JOIN persona p ON a.id_persona = p.id_persona
     INNER JOIN activo ac ON a.id_activo = ac.id_activo
-    INNER JOIN area ar ON a.id_area = ar.id_area
-    INNER JOIN empresa e ON a.id_empresa = e.id_empresa
     LEFT JOIN usuario u ON a.id_usuario = u.id_usuario
     ORDER BY a.fecha_asignacion DESC";
 $asignaciones = verificar_query(sqlsrv_query($conn, $sqlAsignaciones), $sqlAsignaciones);
@@ -58,11 +52,6 @@ $sqlActivos = "SELECT DISTINCT a.id_activo, a.nombreEquipo, a.modelo,
                ORDER BY a.nombreEquipo, a.modelo";
 $activos = verificar_query(sqlsrv_query($conn, $sqlActivos), $sqlActivos);
 
-$sqlAreas = "SELECT id_area, nombre FROM area";
-$areas = verificar_query(sqlsrv_query($conn, $sqlAreas), $sqlAreas);
-
-$sqlEmpresas = "SELECT id_empresa, nombre FROM empresa";
-$empresas = verificar_query(sqlsrv_query($conn, $sqlEmpresas), $sqlEmpresas);
 ?>
 <!DOCTYPE html>
 <html>
@@ -154,8 +143,6 @@ $empresas = verificar_query(sqlsrv_query($conn, $sqlEmpresas), $sqlEmpresas);
                         <th>N°</th>
                         <th>Persona</th>
                         <th>Activo</th>
-                        <th>Área</th>
-                        <th>Empresa</th>
                         <th>Fecha Asignación</th>
                         <th>Fecha Retorno</th>
                         <th>Observaciones</th>
@@ -170,8 +157,6 @@ $empresas = verificar_query(sqlsrv_query($conn, $sqlEmpresas), $sqlEmpresas);
                             <td><?= $counter++ ?></td>
                             <td><?= htmlspecialchars($a["nombre_persona"]) ?></td>
                             <td><?= htmlspecialchars($a["nombre_activo"]) ?></td>
-                            <td><?= htmlspecialchars($a["nombre_area"]) ?></td>
-                            <td><?= htmlspecialchars($a["nombre_empresa"]) ?></td>
                             <td><?= $a["fecha_asignacion"]->format('Y-m-d') ?></td>
                             <td><?= $a["fecha_retorno"] ? $a["fecha_retorno"]->format('Y-m-d') : 'N/A' ?></td>
                             <td><?= htmlspecialchars($a["observaciones"]) ?></td>
@@ -182,8 +167,6 @@ $empresas = verificar_query(sqlsrv_query($conn, $sqlEmpresas), $sqlEmpresas);
                                         data-id="<?= $a['id_asignacion'] ?>"
                                         data-id-persona="<?= $a['id_persona'] ?>"
                                         data-id-activo="<?= $a['id_activo'] ?>"
-                                        data-id-area="<?= $a['id_area'] ?>"
-                                        data-id-empresa="<?= $a['id_empresa'] ?>"
                                         data-fecha-asignacion="<?= $a['fecha_asignacion']->format('Y-m-d') ?>"
                                         data-fecha-retorno="<?= $a['fecha_retorno'] ? $a['fecha_retorno']->format('Y-m-d') : '' ?>"
                                         data-observaciones="<?= htmlspecialchars($a['observaciones']) ?>">
@@ -240,22 +223,6 @@ $empresas = verificar_query(sqlsrv_query($conn, $sqlEmpresas), $sqlEmpresas);
                         </select>
                         <!-- Debug: mostrar cantidad de activos cargados -->
                         <script>console.log('Activos cargados: <?= $activos_count ?>');</script>
-
-                        <label>Área:</label>
-                        <select name="id_area" id="id_area" required>
-                            <option value="">Seleccione un área</option>
-                            <?php while ($ar = sqlsrv_fetch_array($areas, SQLSRV_FETCH_ASSOC)) { ?>
-                                <option value="<?= $ar['id_area'] ?>"><?= htmlspecialchars($ar['nombre']) ?></option>
-                            <?php } ?>
-                        </select>
-
-                        <label>Empresa:</label>
-                        <select name="id_empresa" id="id_empresa" required>
-                            <option value="">Seleccione una empresa</option>
-                            <?php while ($e = sqlsrv_fetch_array($empresas, SQLSRV_FETCH_ASSOC)) { ?>
-                                <option value="<?= $e['id_empresa'] ?>"><?= htmlspecialchars($e['nombre']) ?></option>
-                            <?php } ?>
-                        </select>
 
                         <label>Fecha de Asignación:</label>
                         <input type="date" name="fecha_asignacion" id="fecha_asignacion" required>
