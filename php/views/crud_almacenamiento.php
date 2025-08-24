@@ -1,18 +1,18 @@
 <?php
 include("../includes/conexion.php");
-$solo_admin = true; 
+$solo_admin = true;
 include("../includes/verificar_acceso.php");
 
-//Obtener lista de RAM
-$sqlRams = "SELECT r.id_ram, r.capacidad, m.nombre as marca, r.tipo, r.frecuencia, r.serial_number, r.id_marca
-     FROM RAM r
-     INNER JOIN marca m ON r.id_marca = m.id_marca";
-$rams = sqlsrv_query($conn, $sqlRams);
+// Obtener lista de Almacenamientos
+$sqlAlmacenamientos = "SELECT a.id_almacenamiento, a.tipo, a.interfaz, a.capacidad, a.modelo, a.serial_number, m.nombre as marca, m.id_marca
+     FROM almacenamiento a
+     INNER JOIN marca m ON a.id_marca = m.id_marca";
+$almacenamientos = sqlsrv_query($conn, $sqlAlmacenamientos);
 ?>
 <!DOCTYPE html>
 <html>
     <head>
-        <title>Gestión de RAM</title>
+        <title>Gestión de Almacenamiento</title>
         <link rel="stylesheet" href="../../css/admin/crud_admin.css">
     </head> 
     <body>
@@ -22,56 +22,59 @@ $rams = sqlsrv_query($conn, $sqlRams);
             </div>
             <div class="avatar-contenedor">
                 <img src="../../img/tenor.gif" alt="Avatar" class="avatar">
-                <a class="logout" href="../auth/logout.php">Cerrar sesión</a>  
+                <a class="logout" href="../auth/logout.php">Cerrar sesión</a>
             </div>
         </header>
 
         <a href="vista_admin.php" class="back-button">
-                <img src="../../img/flecha-atras.png" alt="Atrás"> Atrás
+            <img src="../../img/flecha-atras.png" alt="Atrás"> Atrás
         </a>
         <div class="main-container">
             <div class="top-bar">
-                <h2>RAM</h2>
+                <h2>Almacenamiento</h2>
                 <input type="text" id="buscador" placeholder="Busca en la tabla">
                 <button id="btnNuevo">+ NUEVO</button>
             </div>
 
-            <table id="tablaRams">
+            <table id="tablaAlmacenamientos">
                 <thead>
                     <tr>
                         <th>N°</th>
-                        <th>Capacidad</th>
-                        <th>Marca</th>
                         <th>Tipo</th>
-                        <th>Frecuencia</th>
+                        <th>Interfaz</th>
+                        <th>Capacidad</th>
+                        <th>Modelo</th>
                         <th>Serial Number</th>
+                        <th>Marca</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php $counter = 1; ?>
-                    <?php while ($r = sqlsrv_fetch_array($rams, SQLSRV_FETCH_ASSOC)) { ?>
+                    <?php while ($a = sqlsrv_fetch_array($almacenamientos, SQLSRV_FETCH_ASSOC)) { ?>
                         <tr>
                             <td><?= $counter++ ?></td>
-                            <td><?= $r["capacidad"] ?></td>
-                            <td><?= $r["marca"] ?></td>
-                            <td><?= $r["tipo"] ?></td>
-                            <td><?= $r["frecuencia"] ?></td>
-                            <td><?= $r["serial_number"] ?></td>
+                            <td><?= $a["tipo"] ?></td>
+                            <td><?= $a["interfaz"] ?></td>
+                            <td><?= $a["capacidad"] ?></td>
+                            <td><?= $a["modelo"] ?></td>
+                            <td><?= $a["serial_number"] ?></td>
+                            <td><?= $a["marca"] ?></td>
                             <td>
                                 <div class="acciones">
                                     <button type="button" class="btn-icon btn-editar"
-                                        data-id="<?= $r['id_ram'] ?>"
-                                        data-capacidad="<?= htmlspecialchars($r['capacidad']) ?>"
-                                        data-id-marca="<?= htmlspecialchars($r['id_marca']) ?>"
-                                        data-tipo="<?= htmlspecialchars($r['tipo']) ?>"
-                                        data-frecuencia="<?= htmlspecialchars($r['frecuencia']) ?>"
-                                        data-serial="<?= htmlspecialchars($r['serial_number']) ?>">
+                                        data-id="<?= $a['id_almacenamiento'] ?>"
+                                        data-tipo="<?= htmlspecialchars($a['tipo']) ?>"
+                                        data-interfaz="<?= htmlspecialchars($a['interfaz']) ?>"
+                                        data-capacidad="<?= htmlspecialchars($a['capacidad']) ?>"
+                                        data-modelo="<?= htmlspecialchars($a['modelo']) ?>"
+                                        data-serial="<?= htmlspecialchars($a['serial_number']) ?>"
+                                        data-id-marca="<?= htmlspecialchars($a['id_marca']) ?>">
                                         <img src="../../img/editar.png" alt="Editar">
                                     </button>
-                                    <form method="POST" action="../controllers/procesar_ram.php" style="display:inline;" onsubmit="return confirm('¿Eliminar esta RAM?');">
+                                    <form method="POST" action="../controllers/procesar_almacenamiento.php" style="display:inline;" onsubmit="return confirm('¿Eliminar este almacenamiento?');">
                                         <input type="hidden" name="accion" value="eliminar">
-                                        <input type="hidden" name="id_ram" value="<?= $r['id_ram'] ?>">
+                                        <input type="hidden" name="id_almacenamiento" value="<?= $a['id_almacenamiento'] ?>">
                                         <button type="submit" class="btn-icon">
                                             <img src="../../img/eliminar.png" alt="Eliminar">
                                         </button>
@@ -83,17 +86,29 @@ $rams = sqlsrv_query($conn, $sqlRams);
                 </tbody>
             </table>
 
-            <!-- Modal para crear/editar RAM -->
-            <div id="modalRam" class="modal">
+            <!-- Modal para crear/editar Almacenamiento -->
+            <div id="modalAlmacenamiento" class="modal">
                 <div class="modal-content">
                     <span class="close">&times;</span>
-                    <h2 id="modal-title">Nueva RAM</h2>
-                    <form method="POST" action="../controllers/procesar_ram.php" id="formRam">
+                    <h2 id="modal-title">Nuevo Almacenamiento</h2>
+                    <form method="POST" action="../controllers/procesar_almacenamiento.php" id="formAlmacenamiento">
                         <input type="hidden" name="accion" id="accion" value="crear">
-                        <input type="hidden" name="id_ram" id="id_ram">
+                        <input type="hidden" name="id_almacenamiento" id="id_almacenamiento">
+
+                        <label>Tipo:</label>
+                        <input type="text" name="tipo" id="tipo" required>
+
+                        <label>Interfaz:</label>
+                        <input type="text" name="interfaz" id="interfaz">
 
                         <label>Capacidad:</label>
                         <input type="text" name="capacidad" id="capacidad" required>
+
+                        <label>Modelo:</label>
+                        <input type="text" name="modelo" id="modelo">
+
+                        <label>Serial Number:</label>
+                        <input type="text" name="serial_number" id="serial_number">
 
                         <label>Marca:</label>
                         <select name="id_marca" id="id_marca" required>
@@ -106,20 +121,11 @@ $rams = sqlsrv_query($conn, $sqlRams);
                             ?>
                         </select>
 
-                        <label>Tipo:</label>
-                        <input type="text" name="tipo" id="tipo">
-
-                        <label>Frecuencia:</label>
-                        <input type="text" name="frecuencia" id="frecuencia">
-
-                        <label>Serial Number:</label>
-                        <input type="text" name="serial_number" id="serial_number">
-
                         <button type="submit" id="btn-Guardar">Guardar</button>
                     </form>
                 </div>
             </div>
         </div>
-        <script src="../../js/admin/crud_ram.js"></script>
+        <script src="../../js/admin/crud_almacenamiento.js"></script>
     </body>
 </html>

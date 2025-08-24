@@ -1,4 +1,3 @@
-
 document.addEventListener("DOMContentLoaded", function () {
     const modal = document.getElementById("modalPersona");
     const btnNuevo = document.getElementById("btnNuevo");
@@ -6,7 +5,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const form = document.getElementById("formPersona");
 
     // === Lógica para habilitar/deshabilitar "Jefe Inmediato" según tipo de persona ===
-    const tipoSelect = document.getElementById("id_tipo");
+    const tipoSelect = document.getElementById("id_tipo_persona"); // Changed from id_tipo
     const jefeSelect = document.getElementById("jefe_inmediato");
 
     function actualizarJefeInmediato() {
@@ -80,7 +79,7 @@ document.addEventListener("DOMContentLoaded", function () {
             document.getElementById("jefe_inmediato").value = btn.dataset.jefe;
 
 
-            document.getElementById("id_tipo").value = btn.dataset.tipo;
+            document.getElementById("id_tipo_persona").value = btn.dataset.tipo; // Changed from id_tipo
             actualizarJefeInmediato(); // asegurar ejecutar la restricción de jefe inmediato
             document.getElementById("id_situacion_personal").value = btn.dataset.situacion;
             document.getElementById("id_localidad").value = btn.dataset.localidad;

@@ -4,17 +4,19 @@ include("../includes/conexion.php");
 if($_SERVER["REQUEST_METHOD"] === "POST") {
     $accion = $_POST["accion"] ?? '';
 
-    // Estos nombres deben coincidir con los del formulario
     $capacidad = $_POST["capacidad"] ?? '';
-    $marca = $_POST["marca"] ?? '';
+    $id_marca = $_POST["id_marca"] ?? '';
+    $tipo = $_POST["tipo"] ?? '';
+    $frecuencia = $_POST["frecuencia"] ?? '';
+    $serial_number = $_POST["serial_number"] ?? '';
     $id_ram = $_POST["id_ram"] ?? '';
 
     if ($accion === "crear") {
-        $sql = "INSERT INTO ram (capacidad, marca) VALUES (?, ?)";
-        $params = [$capacidad, $marca];
+        $sql = "INSERT INTO RAM (capacidad, id_marca, tipo, frecuencia, serial_number) VALUES (?, ?, ?, ?, ?)";
+        $params = [$capacidad, $id_marca, $tipo, $frecuencia, $serial_number];
     } elseif ($accion === "editar" && !empty($id_ram)) {
-        $sql = "UPDATE ram SET capacidad = ?, marca = ? WHERE id_ram = ?";
-        $params = [$capacidad, $marca, $id_ram];
+        $sql = "UPDATE RAM SET capacidad = ?, id_marca = ?, tipo = ?, frecuencia = ?, serial_number = ? WHERE id_ram = ?";
+        $params = [$capacidad, $id_marca, $tipo, $frecuencia, $serial_number, $id_ram];
     } elseif ($accion === "eliminar" && !empty($id_ram)) {
         $sql = "DELETE FROM ram WHERE id_ram = ?";
         $params = [$id_ram];

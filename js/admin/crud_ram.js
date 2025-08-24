@@ -27,7 +27,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
             document.getElementById("id_ram").value = btn.dataset.id;
             document.getElementById("capacidad").value = btn.dataset.capacidad;
-            document.getElementById("marca").value = btn.dataset.marca;
+            document.getElementById("id_marca").value = btn.dataset.idMarca;
+            document.getElementById("tipo").value = btn.dataset.tipo;
+            document.getElementById("frecuencia").value = btn.dataset.frecuencia;
+            document.getElementById("serial_number").value = btn.dataset.serial;
 
             modal.style.display = "block";
         });

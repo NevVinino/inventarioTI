@@ -3,42 +3,80 @@ include("../includes/conexion.php");
 $solo_admin = true;
 include("../includes/verificar_acceso.php");
 
-// Consultar datos relacionados
-$tipo = sqlsrv_query($conn, "SELECT * FROM tipo");
+// Consultar datos relacionados y verificar errores
+$tipo = sqlsrv_query($conn, "SELECT * FROM tipo_persona");
+if ($tipo === false) {
+    die("Error al consultar tipos de persona: " . print_r(sqlsrv_errors(), true));
+}
+
 $situaciones = sqlsrv_query($conn, "SELECT * FROM situacion_personal");
+if ($situaciones === false) {
+    die("Error al consultar situaciones: " . print_r(sqlsrv_errors(), true));
+}
+
 $localidades = sqlsrv_query($conn, "SELECT * FROM localidad");
+if ($localidades === false) {
+    die("Error al consultar localidades: " . print_r(sqlsrv_errors(), true));
+}
+
 $areas = sqlsrv_query($conn, "SELECT * FROM area");
+if ($areas === false) {
+    die("Error al consultar áreas: " . print_r(sqlsrv_errors(), true));
+}
+
 $empresas = sqlsrv_query($conn, "SELECT * FROM empresa");
+if ($empresas === false) {
+    die("Error al consultar empresas: " . print_r(sqlsrv_errors(), true));
+}
 
 // Consulta de personas
 $sql = "SELECT 
             p.*, 
             CONCAT(j.nombre, ' ', j.apellido) AS jefe_nombre,
-            tipo_j.nombre_tipo AS tipo_jefe_nombre,
-            t.nombre_tipo AS tipo,
+            tipo_j.nombre_tipo_persona AS tipo_jefe_nombre,
+            t.nombre_tipo_persona AS tipo,
             s.situacion AS situacion,
             l.localidad_nombre AS localidad,
             a.nombre AS area_nombre,
             e.nombre AS empresa_nombre
         FROM persona p
         LEFT JOIN persona j ON p.jefe_inmediato = j.id_persona
-        LEFT JOIN tipo tipo_j ON j.id_tipo = tipo_j.id_tipo
-        JOIN tipo t ON p.id_tipo = t.id_tipo
+        LEFT JOIN tipo_persona tipo_j ON j.id_tipo_persona = tipo_j.id_tipo_persona
+        JOIN tipo_persona t ON p.id_tipo_persona = t.id_tipo_persona
         JOIN situacion_personal s ON p.id_situacion_personal = s.id_situacion
         JOIN localidad l ON p.id_localidad = l.id_localidad
         JOIN area a ON p.id_area = a.id_area
         JOIN empresa e ON p.id_empresa = e.id_empresa";
 
 $personas = sqlsrv_query($conn, $sql);
+if ($personas === false) {
+    die("Error al consultar personas: " . print_r(sqlsrv_errors(), true));
+}
 
 // Obtener lista de jefes (tipo = Gerente o Jefe Area)
 $jefes = sqlsrv_query($conn, "
     SELECT p.id_persona, p.nombre + ' ' + p.apellido AS nombre_completo,
-    t.nombre_tipo
+    t.nombre_tipo_persona AS nombre_tipo
     FROM persona p
-    JOIN tipo t ON p.id_tipo = t.id_tipo
-    WHERE t.nombre_tipo IN ('Gerente', 'Jefe Area')
+    JOIN tipo_persona t ON p.id_tipo_persona = t.id_tipo_persona
+    WHERE t.nombre_tipo_persona IN ('Gerente', 'Jefe Area')
 ");
+if ($jefes === false) {
+    die("Error al consultar jefes: " . print_r(sqlsrv_errors(), true));
+}
+
+// Reinicializar recursos antes de usarlos en el formulario
+sqlsrv_free_stmt($tipo);
+sqlsrv_free_stmt($situaciones);
+sqlsrv_free_stmt($localidades);
+sqlsrv_free_stmt($areas);
+sqlsrv_free_stmt($empresas);
+
+$tipo = sqlsrv_query($conn, "SELECT * FROM tipo_persona");
+$situaciones = sqlsrv_query($conn, "SELECT * FROM situacion_personal");
+$localidades = sqlsrv_query($conn, "SELECT * FROM localidad");
+$areas = sqlsrv_query($conn, "SELECT * FROM area");
+$empresas = sqlsrv_query($conn, "SELECT * FROM empresa");
 ?>
 
 <!DOCTYPE html>
@@ -89,7 +127,7 @@ $jefes = sqlsrv_query($conn, "
         </thead>
         <tbody>
             <?php $counter = 1; ?>
-            <?php while ($p = sqlsrv_fetch_array($personas, SQLSRV_FETCH_ASSOC)) { ?>
+            <?php if ($personas !== false) { while ($p = sqlsrv_fetch_array($personas, SQLSRV_FETCH_ASSOC)) { ?>
             <tr>
                 <td><?= $counter++ ?></td>
                 <td><?= htmlspecialchars($p['nombre']) ?></td>
@@ -124,7 +162,7 @@ $jefes = sqlsrv_query($conn, "
                                 data-correo="<?= $p['correo'] ?>"
                                 data-celular="<?= $p['celular'] ?>"
                                 data-jefe="<?= $p['jefe_inmediato'] ?>"
-                                data-tipo="<?= $p['id_tipo'] ?>"
+                                data-tipo="<?= $p['id_tipo_persona'] ?>"
                                 data-situacion="<?= $p['id_situacion_personal'] ?>"
                                 data-localidad="<?= $p['id_localidad'] ?>"
                                 data-area="<?= $p['id_area'] ?>"
@@ -141,7 +179,7 @@ $jefes = sqlsrv_query($conn, "
                     </div>
                 </td>
             </tr>
-            <?php } ?>
+            <?php } } ?>
         </tbody>
     </table>
 </div>
@@ -180,38 +218,38 @@ $jefes = sqlsrv_query($conn, "
             </select>
 
             <label>Tipo:</label>
-            <select name="id_tipo" id="id_tipo" required>
-                <?php while ($s = sqlsrv_fetch_array($tipo, SQLSRV_FETCH_ASSOC)) { ?>
-                    <option value="<?= $s['id_tipo'] ?>"><?= $s['nombre_tipo'] ?></option>
-                <?php } ?>
+            <select name="id_tipo_persona" id="id_tipo_persona" required>
+                <?php if ($tipo !== false) { while ($s = sqlsrv_fetch_array($tipo, SQLSRV_FETCH_ASSOC)) { ?>
+                    <option value="<?= $s['id_tipo_persona'] ?>"><?= $s['nombre_tipo_persona'] ?></option>
+                <?php } } ?>
             </select>
 
             <label>Situación Personal:</label>
             <select name="id_situacion_personal" id="id_situacion_personal" required>
-                <?php while ($s = sqlsrv_fetch_array($situaciones, SQLSRV_FETCH_ASSOC)) { ?>
+                <?php if ($situaciones !== false) { while ($s = sqlsrv_fetch_array($situaciones, SQLSRV_FETCH_ASSOC)) { ?>
                     <option value="<?= $s['id_situacion'] ?>"><?= $s['situacion'] ?></option>
-                <?php } ?>
+                <?php } } ?>
             </select>
 
             <label>Localidad:</label>
             <select name="id_localidad" id="id_localidad" required>
-                <?php while ($l = sqlsrv_fetch_array($localidades, SQLSRV_FETCH_ASSOC)) { ?>
+                <?php if ($localidades !== false) { while ($l = sqlsrv_fetch_array($localidades, SQLSRV_FETCH_ASSOC)) { ?>
                     <option value="<?= $l['id_localidad'] ?>"><?= $l['localidad_nombre'] ?></option>
-                <?php } ?>
+                <?php } } ?>
             </select>
 
             <label>Área:</label>
             <select name="id_area" id="id_area" required>
-                <?php while ($a = sqlsrv_fetch_array($areas, SQLSRV_FETCH_ASSOC)) { ?>
+                <?php if ($areas !== false) { while ($a = sqlsrv_fetch_array($areas, SQLSRV_FETCH_ASSOC)) { ?>
                     <option value="<?= $a['id_area'] ?>"><?= $a['nombre'] ?></option>
-                <?php } ?>
+                <?php } } ?>
             </select>
 
             <label>Empresa:</label>
             <select name="id_empresa" id="id_empresa" required>
-                <?php while ($e = sqlsrv_fetch_array($empresas, SQLSRV_FETCH_ASSOC)) { ?>
+                <?php if ($empresas !== false) { while ($e = sqlsrv_fetch_array($empresas, SQLSRV_FETCH_ASSOC)) { ?>
                     <option value="<?= $e['id_empresa'] ?>"><?= $e['nombre'] ?></option>
-                <?php } ?>
+                <?php } } ?>
             </select>
 
             <button type="submit">Guardar</button>
