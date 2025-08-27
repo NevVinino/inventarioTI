@@ -240,6 +240,7 @@ $activos = $filas_temp;
                     <div class="acciones">
                         <!-- Botón ver -->
                         <button type="button" class="btn-icon btn-ver" 
+                            data-id="<?= htmlspecialchars($a['id_activo']) ?>"
                             data-nombreequipo="<?= htmlspecialchars($a['nombreEquipo'] ?? '') ?>"
                             data-modelo="<?= htmlspecialchars($a['modelo'] ?? '') ?>"
                             data-mac="<?= htmlspecialchars($a['mac'] ?? '') ?>"
@@ -283,6 +284,22 @@ $activos = $filas_temp;
                         >
                             <img src="../../img/editar.png" alt="Editar">
                         </button>
+
+                        <!-- Botones QR -->
+                        <?php if(isset($a['ruta_qr']) && !empty($a['ruta_qr'])): ?>
+                            <!-- QR ya existe, mostrar botón de descarga Y regenerar -->
+                            <a href="../../<?= htmlspecialchars($a['ruta_qr']) ?>" download class="btn-text btn-qr-download" data-id="<?= htmlspecialchars($a['id_activo']) ?>" title="Descargar código QR existente">
+                                Descargar QR
+                            </a>
+                            <button type="button" class="btn-text btn-qr-regenerate" data-id="<?= htmlspecialchars($a['id_activo']) ?>" title="Regenerar código QR">
+                                Regenerar QR
+                            </button>
+                        <?php else: ?>
+                            <!-- QR no existe, mostrar botón para generar -->
+                            <button type="button" class="btn-text btn-qr-generate" data-id="<?= htmlspecialchars($a['id_activo']) ?>" title="Generar nuevo código QR">
+                                Generar QR
+                            </button>
+                        <?php endif; ?>
 
                         <?php if (!isset($a['estado']) || strtolower($a['estado']) !== 'asignado'): ?>
                             <!-- Botón eliminar (solo visible si no está asignado) -->
@@ -356,9 +373,9 @@ $activos = $filas_temp;
             <input type="text" name="numeroIP" id="numeroIP">
 
             <label>Observaciones:</label>
-            <button type="button" id="toggleObservaciones">Mostrar</button>
+            <button type="button" id="toggleObservaciones" class="btn-toggle">Mostrar</button>
             <div id="contenedorObservaciones" style="display: none;">
-                <textarea name="observaciones" id="observaciones"></textarea>
+                <textarea name="observaciones" id="observaciones" rows="3" cols="50"></textarea>
             </div>
             <br>
             <?php
@@ -503,11 +520,140 @@ $activos = $filas_temp;
     </div>
 </div>
 
-<script src="../../js/admin/crud_laptop.js"></script>
+<!-- CSS para el botón de QR dentro del head -->
+<style>
+    /* Estilos para botones de texto */
+    .btn-text {
+        background-color: #6a1b9a;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: bold;
+        text-decoration: none;
+        display: inline-block;
+        margin: 2px;
+        transition: background-color 0.3s ease;
+        min-width: 90px;
+        text-align: center;
+    }
+    
+    .btn-qr-generate {
+        background-color: #6a1b9a; /* Morado para generar */
+    }
+    
+    .btn-qr-generate:hover {
+        background-color: #9c27b0;
+    }
+    
+    .btn-qr-regenerate {
+        background-color: #ff9800; /* Naranja para regenerar */
+    }
+    
+    .btn-qr-regenerate:hover {
+        background-color: #f57c00;
+    }
+    
+    .btn-qr-download {
+        background-color: #4CAF50; /* Verde para descargar */
+    }
+    
+    .btn-qr-download:hover {
+        background-color: #45a049;
+    }
+    
+    /* Hacer los iconos existentes más grandes */
+    .btn-icon {
+        padding: 8px;
+        min-width: 36px;
+        min-height: 36px;
+    }
+    
+    .btn-icon img {
+        width: 20px;
+        height: 20px;
+    }
+    
+    .btn-toggle {
+        background-color: #007cba;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 3px;
+        cursor: pointer;
+        margin-left: 10px;
+    }
+    
+    .btn-toggle:hover {
+        background-color: #005a8b;
+    }
+    
+    /* Estilo para imagen QR en modal de visualización */
+    #view-qr img {
+        max-width: 200px;
+        max-height: 200px;
+    }
+    
+    .btn-download {
+        display: block;
+        text-align: center;
+        background-color: #4CAF50;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 4px;
+        text-decoration: none;
+        margin-top: 10px;
+        width: fit-content;
+    }
+    
+    .btn-download:hover {
+        background-color: #45a049;
+    }
+    
+    .componente-tag {
+        display: inline-block;
+        background-color: #e7f3ff;
+        border: 1px solid #b8daff;
+        border-radius: 3px;
+        padding: 5px 8px;
+        margin: 2px;
+        font-size: 12px;
+    }
+    
+    .componente-tag .btn-eliminar-componente {
+        margin-left: 5px;
+        background-color: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 2px;
+        cursor: pointer;
+        padding: 1px 4px;
+        font-size: 10px;
+    }
+    
+    .componente-tag .btn-eliminar-componente:hover {
+        background-color: #c82333;
+    }
+    
+    .componentes-seleccionados {
+        min-height: 30px;
+        border: 1px dashed #ccc;
+        padding: 5px;
+        margin-top: 5px;
+        border-radius: 3px;
+    }
+    
+    /* Mejorar la disposición de acciones */
+    .acciones {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+</style>
 
-</body></body><script src="../../js/admin/crud_admin.js"></script></div></div>
-
-</html>
 <script src="../../js/admin/crud_laptop.js"></script>
 
 </body>

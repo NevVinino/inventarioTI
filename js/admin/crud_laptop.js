@@ -44,19 +44,6 @@ document.addEventListener("DOMContentLoaded", function () {
         el.textContent = text;
     }
 
-    // --- toggle observaciones ---
-    if (btnToggleObs && contenedorObs) {
-        btnToggleObs.addEventListener("click", function () {
-            if (contenedorObs.style.display === "none" || contenedorObs.style.display === "") {
-                contenedorObs.style.display = "block";
-                btnToggleObs.textContent = "Ocultar";
-            } else {
-                contenedorObs.style.display = "none";
-                btnToggleObs.textContent = "Mostrar";
-            }
-        });
-    }
-
     // --- configuración de componentes ---
     const componentesSeleccionados = {
         CPU: new Set(),
@@ -64,21 +51,70 @@ document.addEventListener("DOMContentLoaded", function () {
         Almacenamiento: new Set()
     };
 
-    // Función global para agregar componentes
+    // --- toggle observaciones - MEJORADO ---
+    function configurarToggleObservaciones() {
+        const btnToggle = document.getElementById("toggleObservaciones");
+        const contenedor = document.getElementById("contenedorObservaciones");
+        
+        if (btnToggle && contenedor) {
+            // Remover listeners anteriores
+            btnToggle.replaceWith(btnToggle.cloneNode(true));
+            const nuevoBtn = document.getElementById("toggleObservaciones");
+            
+            nuevoBtn.addEventListener("click", function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                console.log("Toggle observaciones clickeado");
+                
+                if (contenedor.style.display === "none" || contenedor.style.display === "") {
+                    contenedor.style.display = "block";
+                    nuevoBtn.textContent = "Ocultar";
+                    console.log("Observaciones mostradas");
+                } else {
+                    contenedor.style.display = "none";
+                    nuevoBtn.textContent = "Mostrar";
+                    console.log("Observaciones ocultadas");
+                }
+            });
+            
+            console.log("Toggle de observaciones configurado correctamente");
+        } else {
+            console.error("Elementos de observaciones no encontrados:", {
+                btnToggle: !!btnToggle,
+                contenedor: !!contenedor
+            });
+        }
+    }
+
+    // Función global para agregar componentes - CORREGIDA
     window.agregarComponente = function (tipo) {
         const select = document.getElementById(`select${tipo}`);
         const contenedor = document.getElementById(`${tipo.toLowerCase()}Seleccionados`);
         const hiddenInput = document.getElementById(`${tipo.toLowerCase()}sHidden`);
 
-        if (!select || !select.value) return;
+        console.log(`Intentando agregar componente ${tipo}:`, {
+            select: select?.value,
+            selectExists: !!select,
+            contenedor: !!contenedor,
+            hiddenInput: !!hiddenInput,
+            currentSize: componentesSeleccionados[tipo].size
+        });
+
+        if (!select || !select.value) {
+            alert('Por favor seleccione un componente primero');
+            return;
+        }
 
         if (componentesSeleccionados[tipo].has(select.value)) {
             alert('Este componente ya está agregado');
             return;
         }
 
+        // Agregar al Set
         componentesSeleccionados[tipo].add(select.value);
 
+        // Crear elemento visual
         const div = document.createElement('div');
         div.className = 'componente-tag';
         div.dataset.id = select.value;
@@ -87,23 +123,36 @@ document.addEventListener("DOMContentLoaded", function () {
         const btnEliminar = document.createElement('button');
         btnEliminar.type = 'button';
         btnEliminar.textContent = 'X';
+        btnEliminar.className = 'btn-eliminar-componente';
         btnEliminar.onclick = () => {
-            componentesSeleccionados[tipo].delete(select.value);
+            const idToRemove = div.dataset.id;
+            componentesSeleccionados[tipo].delete(idToRemove);
             div.remove();
             actualizarHiddenInput(tipo);
+            console.log(`Componente ${tipo} eliminado. Total:`, componentesSeleccionados[tipo].size);
         };
 
         div.appendChild(btnEliminar);
         contenedor.appendChild(div);
+        
+        // Actualizar input oculto
         actualizarHiddenInput(tipo);
 
+        // Limpiar select
         select.value = '';
+        
+        console.log(`Componente ${tipo} agregado. Total:`, componentesSeleccionados[tipo].size);
+        console.log(`Hidden input value:`, hiddenInput?.value);
     };
 
     function actualizarHiddenInput(tipo) {
         const hiddenInput = document.getElementById(`${tipo.toLowerCase()}sHidden`);
         if (hiddenInput) {
-            hiddenInput.value = Array.from(componentesSeleccionados[tipo]).join(',');
+            const valores = Array.from(componentesSeleccionados[tipo]);
+            hiddenInput.value = valores.join(',');
+            console.log(`Hidden input ${tipo} actualizado:`, hiddenInput.value, 'Array:', valores);
+        } else {
+            console.error(`Hidden input para ${tipo} no encontrado`);
         }
     }
 
@@ -160,10 +209,12 @@ document.addEventListener("DOMContentLoaded", function () {
     if (fechaCompraInput) fechaCompraInput.addEventListener("change", calcularAntiguedad);
     if (garantiaInput) garantiaInput.addEventListener("change", calcularEstadoGarantia);
 
-    // --- abrir modal "Nuevo" ---
+    // --- abrir modal "Nuevo" - MEJORADO ---
     if (btnNuevo) {
         btnNuevo.addEventListener("click", function () {
             if (!modal) return;
+
+            console.log("Abriendo modal nuevo...");
 
             const modalTitle = document.getElementById("modal-title");
             if (modalTitle) modalTitle.textContent = "Registrar Laptop";
@@ -187,6 +238,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
             safeSetText(labelAntiguedad, "(No calculado)");
             safeSetText(labelGarantia, "(No calculado)");
+
+            // Configurar observaciones
+            const contenedorObs = document.getElementById("contenedorObservaciones");
+            const btnToggleObs = document.getElementById("toggleObservaciones");
             if (btnToggleObs) btnToggleObs.textContent = "Mostrar";
             if (contenedorObs) contenedorObs.style.display = "none";
 
@@ -194,6 +249,13 @@ document.addEventListener("DOMContentLoaded", function () {
             calcularEstadoGarantia();
 
             modal.style.display = "block";
+            
+            // Configurar toggle de observaciones DESPUÉS de abrir el modal
+            setTimeout(() => {
+                configurarToggleObservaciones();
+            }, 100);
+
+            console.log("Modal abierto, componentes limpiados");
         });
     }
 
@@ -223,7 +285,7 @@ document.addEventListener("DOMContentLoaded", function () {
         btn.addEventListener("click", function () {
             if (!modalView) return;
 
-            console.log("Dataset del botón ver:", this.dataset); // Depuración
+            console.log("Dataset del botón ver:", this.dataset);
             
             // Limpiar campos para evitar datos de visualizaciones anteriores
             document.querySelectorAll('#modalVisualizacion .detalle-item span').forEach(span => {
@@ -309,7 +371,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (!modal) return;
             modal.style.display = "block";
             
-            console.log("Dataset del botón editar:", this.dataset); // Depuración
+            console.log("Dataset del botón editar:", this.dataset);
             
             // Establecer título y acción
             document.getElementById("modal-title").textContent = "Editar Laptop";
@@ -349,13 +411,16 @@ document.addEventListener("DOMContentLoaded", function () {
             // Verificar si el activo está asignado antes de permitir edición
             verificarAsignacion(this.dataset.id);
             
-            // Mostrar observaciones si las hay
+            // Configurar observaciones
+            const contenedorObs = document.getElementById("contenedorObservaciones");
+            const btnToggleObs = document.getElementById("toggleObservaciones");
+            
             if (this.dataset.observaciones) {
-                contenedorObs.style.display = "block";
-                btnToggleObs.textContent = "Ocultar";
+                if (contenedorObs) contenedorObs.style.display = "block";
+                if (btnToggleObs) btnToggleObs.textContent = "Ocultar";
             } else {
-                contenedorObs.style.display = "none";
-                btnToggleObs.textContent = "Mostrar";
+                if (contenedorObs) contenedorObs.style.display = "none";
+                if (btnToggleObs) btnToggleObs.textContent = "Mostrar";
             }
             
             // Actualizar etiquetas
@@ -373,6 +438,11 @@ document.addEventListener("DOMContentLoaded", function () {
             cargarComponentes('CPU', this.dataset.cpus);
             cargarComponentes('RAM', this.dataset.rams);
             cargarComponentes('Almacenamiento', this.dataset.almacenamientos);
+            
+            // Configurar toggle de observaciones DESPUÉS de configurar todo
+            setTimeout(() => {
+                configurarToggleObservaciones();
+            }, 100);
         });
     });
 
@@ -424,25 +494,67 @@ document.addEventListener("DOMContentLoaded", function () {
             .catch(error => console.error('Error verificando asignación:', error));
     }
 
-    // --- validación del formulario ---
+    // --- validación del formulario - CORREGIDA ---
     if (form) {
         form.addEventListener("submit", function(event) {
-            // Validar que al menos se haya seleccionado un componente de cada tipo
-            if (componentesSeleccionados.CPU.size === 0) {
+            console.log("=== INICIANDO VALIDACIÓN ===");
+            
+            // Verificar estado actual de componentes
+            console.log("Estado de componentesSeleccionados:", {
+                CPU: {
+                    size: componentesSeleccionados.CPU.size,
+                    values: Array.from(componentesSeleccionados.CPU)
+                },
+                RAM: {
+                    size: componentesSeleccionados.RAM.size,
+                    values: Array.from(componentesSeleccionados.RAM)
+                },
+                Almacenamiento: {
+                    size: componentesSeleccionados.Almacenamiento.size,
+                    values: Array.from(componentesSeleccionados.Almacenamiento)
+                }
+            });
+
+            // Verificar inputs ocultos
+            const cpuHidden = document.getElementById("cpusHidden");
+            const ramHidden = document.getElementById("ramsHidden");
+            const almacenamientoHidden = document.getElementById("almacenamientosHidden");
+            
+            console.log("Estado de inputs ocultos:", {
+                cpusHidden: cpuHidden?.value,
+                ramsHidden: ramHidden?.value,
+                almacenamientosHidden: almacenamientoHidden?.value
+            });
+
+            // Validar usando AMBOS métodos
+            let cpuValido = componentesSeleccionados.CPU.size > 0 || (cpuHidden?.value && cpuHidden.value.trim() !== '');
+            let ramValido = componentesSeleccionados.RAM.size > 0 || (ramHidden?.value && ramHidden.value.trim() !== '');
+            let almacenamientoValido = componentesSeleccionados.Almacenamiento.size > 0 || (almacenamientoHidden?.value && almacenamientoHidden.value.trim() !== '');
+
+            console.log("Validación de componentes:", {
+                cpuValido,
+                ramValido,
+                almacenamientoValido
+            });
+            
+            if (!cpuValido) {
                 event.preventDefault();
                 alert("Debe agregar al menos un procesador (CPU)");
+                console.log("Validación fallida: CPU");
                 return false;
             }
             
-            if (componentesSeleccionados.RAM.size === 0) {
+            if (!ramValido) {
                 event.preventDefault();
                 alert("Debe agregar al menos una memoria RAM");
+                console.log("Validación fallida: RAM");
                 return false;
             }
             
-            if (componentesSeleccionados.Almacenamiento.size === 0) {
+            if (!almacenamientoValido) {
                 event.preventDefault();
                 alert("Debe agregar al menos un dispositivo de almacenamiento");
+                console.log("Validación fallida: Almacenamiento");
                 return false;
             }
             
@@ -472,12 +584,99 @@ document.addEventListener("DOMContentLoaded", function () {
                 return false;
             }
             
-            // Todo validado correctamente
+            console.log("=== VALIDACIÓN EXITOSA ===");
             return true;
         });
     }
 
+    // --- Botones de generación de QR ---
+    document.querySelectorAll('.btn-qr-generate, .btn-qr-regenerate').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            const isRegenerate = this.classList.contains('btn-qr-regenerate');
+            
+            // Debug: mostrar todos los atributos del botón
+            console.log(`Botón ${isRegenerate ? 'Regenerar' : 'Generar'} QR clickeado:`);
+            console.log("Element:", this);
+            console.log("Dataset:", this.dataset);
+            
+            const idActivo = this.getAttribute('data-id') || this.dataset.id;
+            
+            console.log("ID del activo obtenido:", idActivo);
+            
+            if (!idActivo) {
+                console.error("No se encontró data-id en el botón");
+                alert('No se pudo identificar el ID del activo');
+                return;
+            }
+
+            // Mensaje de confirmación para regenerar
+            if (isRegenerate) {
+                if (!confirm('¿Está seguro de que desea regenerar el código QR? Esto reemplazará el QR actual.')) {
+                    return;
+                }
+            }
+
+            this.disabled = true;
+            const originalText = this.textContent;
+            this.textContent = isRegenerate ? 'Regenerando...' : 'Generando...';
+
+            console.log(`Iniciando ${isRegenerate ? 'regeneración' : 'generación'} de QR para activo ID: ${idActivo}`);
+
+            // Llamada AJAX para generar QR
+            fetch('../controllers/procesar_laptop.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: `id_activo=${idActivo}&generar_qr=1`
+            })
+            .then(response => {
+                console.log('Respuesta recibida:', response.status);
+                return response.text();
+            })
+            .then(text => {
+                console.log('Texto de respuesta:', text);
+                try {
+                    const data = JSON.parse(text);
+                    if (data.success) {
+                        console.log(`QR ${isRegenerate ? 'regenerado' : 'generado'} exitosamente:`, data.data);
+                        alert(`QR ${isRegenerate ? 'regenerado' : 'generado'} correctamente`);
+                        
+                        // Encontrar el botón "Ver" asociado a este activo y actualizar su data-qr
+                        const btnVer = document.querySelector(`.btn-ver[data-id="${idActivo}"]`);
+                        if (btnVer) {
+                            btnVer.setAttribute('data-qr', data.data.ruta_qr);
+                        }
+                        
+                        // Recargar la página para mostrar el QR actualizado
+                        window.location.reload();
+                    } else {
+                        console.error('Error en la respuesta:', data.error);
+                        alert(`Error al ${isRegenerate ? 'regenerar' : 'generar'} el QR: ` + (data.error || 'Error desconocido'));
+                    }
+                } catch (parseError) {
+                    console.error('Error parseando JSON:', parseError);
+                    console.error('Respuesta original:', text);
+                    alert('Error en la respuesta del servidor. Revisa la consola para más detalles.');
+                }
+            })
+            .catch(error => {
+                console.error('Error en la petición:', error);
+                alert('Error al comunicarse con el servidor: ' + error.message);
+            })
+            .finally(() => {
+                this.disabled = false;
+                this.textContent = originalText;
+            });
+        });
+    });
+
     // --- inicialización ---
+    // Configurar toggle inicial
+    configurarToggleObservaciones();
+    
     // Ejecutar depuración de tabla al cargar
     window.addEventListener('load', function() {
         debugTabla();

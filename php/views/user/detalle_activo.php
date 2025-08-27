@@ -13,43 +13,63 @@ if (!$conn) {
     die("Error de conexión: " . print_r(sqlsrv_errors(), true));
 }
 
-
-
 $sql = "
 SELECT 
     a.*,
-    c.descripcion AS cpu_desc,
-    r.capacidad + ' - ' + r.marca AS ram_desc,
-    s.capacidad + ' - ' + s.tipo + ' - ' + s.marca AS storage_desc,
+    l.nombreEquipo,
+    l.modelo,
+    l.numeroSerial,
+    l.mac,
+    l.numeroIP,
+    l.fechaCompra,
+    l.garantia,
+    l.precioCompra,
+    l.antiguedad,
+    l.ordenCompra,
+    l.estadoGarantia,
+    l.observaciones,
     ea.vestado_activo AS estado,
-    ta.vtipo_activo AS tipo,
     m.nombre AS marca,
-    u.username AS usuario_registro,
-    u2.username AS usuario_asignacion,
-    p.nombre AS persona_nombre,
-    p.apellido AS persona_apellido,
-    p.id_area,
-    ar.nombre AS area_nombre,
-    emp.nombre AS empresa_persona,
     emp_activo.nombre AS empresa_activo,
     asi.fecha_asignacion,
     asi.fecha_retorno,
-    asi.observaciones AS obs_asignacion
+    asi.observaciones AS obs_asignacion,
+    p.nombre AS persona_nombre,
+    p.apellido AS persona_apellido,
+    ar.nombre AS area_nombre,
+    emp.nombre AS empresa_persona,
+    u2.username AS usuario_asignacion,
+    (
+        SELECT STRING_AGG(pr.modelo + ' ' + ISNULL(pr.generacion, ''), ', ')
+        FROM laptop_procesador lp 
+        JOIN procesador pr ON lp.id_cpu = pr.id_cpu 
+        WHERE lp.id_laptop = l.id_laptop
+    ) as cpu_desc,
+    (
+        SELECT STRING_AGG(r.capacidad + ' - ' + ISNULL(mr.nombre, 'Sin marca'), ', ')
+        FROM laptop_ram lr 
+        JOIN RAM r ON lr.id_ram = r.id_ram 
+        LEFT JOIN marca mr ON r.id_marca = mr.id_marca
+        WHERE lr.id_laptop = l.id_laptop
+    ) as ram_desc,
+    (
+        SELECT STRING_AGG(s.capacidad + ' - ' + s.tipo + ' - ' + ISNULL(ms.nombre, 'Sin marca'), ', ')
+        FROM laptop_almacenamiento la 
+        JOIN almacenamiento s ON la.id_almacenamiento = s.id_almacenamiento 
+        LEFT JOIN marca ms ON s.id_marca = ms.id_marca
+        WHERE la.id_laptop = l.id_laptop
+    ) as storage_desc
 FROM activo a
-LEFT JOIN cpu c ON a.id_cpu = c.id_cpu
-LEFT JOIN ram r ON a.id_ram = r.id_ram
-LEFT JOIN storage s ON a.id_storage = s.id_storage
-LEFT JOIN estado_activo ea ON a.id_estado_activo = ea.id_estado_activo
-LEFT JOIN tipo_activo ta ON a.id_tipo_activo = ta.id_tipo_activo
-LEFT JOIN marca m ON a.id_marca = m.id_marca
-LEFT JOIN empresa emp_activo ON a.id_empresa = emp_activo.id_empresa
-LEFT JOIN usuario u ON a.id_usuario = u.id_usuario
+INNER JOIN laptop l ON a.id_laptop = l.id_laptop
+LEFT JOIN estado_activo ea ON l.id_estado_activo = ea.id_estado_activo
+LEFT JOIN marca m ON l.id_marca = m.id_marca
+LEFT JOIN empresa emp_activo ON l.id_empresa = emp_activo.id_empresa
 LEFT JOIN asignacion asi ON a.id_activo = asi.id_activo AND (asi.fecha_retorno IS NULL OR asi.fecha_retorno > GETDATE())
 LEFT JOIN usuario u2 ON asi.id_usuario = u2.id_usuario
 LEFT JOIN persona p ON asi.id_persona = p.id_persona
 LEFT JOIN area ar ON p.id_area = ar.id_area
 LEFT JOIN empresa emp ON p.id_empresa = emp.id_empresa
-WHERE a.id_activo = ?";
+WHERE a.id_activo = ? AND a.tipo_activo = 'Laptop'";
 
 $stmt = sqlsrv_query($conn, $sql, [$id_activo]);
 
