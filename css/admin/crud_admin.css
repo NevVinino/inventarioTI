@@ -334,8 +334,28 @@ textarea#observaciones {
     font-weight: bold;
 }
 
-/* BOTON DE DESCARGAR QR EN MODAL VISUALIZACION DEL ACTIVO (crud_activo.php)*/
+/* ===== ESTILOS PARA COMPONENTES (Anteriormente en components.css) ===== */
 
+/* Estilos para los componentes en el modal de visualización */
+.componentes-lista {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.componentes-lista li {
+    margin-bottom: 4px;
+}
+
+.detalle-item {
+    margin-bottom: 12px;
+}
+
+.qr-container {
+    grid-column: span 2;
+    text-align: center;
+}
+
+/* Actualizar para usar los estilos existentes del btn-download */
 .btn-download {
     display: inline-block;
     margin-top: 10px;
@@ -349,4 +369,204 @@ textarea#observaciones {
 
 .btn-download:hover {
     background-color: #45a049;
+}
+
+/* Estilo para los tags de componentes seleccionados */
+.componente-tag {
+    display: inline-flex;
+    align-items: center;
+    background-color: #e9f5ff;
+    border: 1px solid #cce5ff;
+    border-radius: 4px;
+    padding: 5px 10px;
+    margin: 5px;
+    font-size: 14px;
+}
+
+.componente-tag button {
+    background: none;
+    border: none;
+    color: #dc3545;
+    margin-left: 8px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+/* Mejoras para la sección de componentes */
+.componentes-section {
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+    padding: 15px;
+    background-color: #f8f9fa;
+}
+
+.componente-grupo {
+    margin-bottom: 15px;
+}
+
+.componentes-seleccionados {
+    margin-top: 10px;
+    min-height: 35px;
+}
+
+/* ===== ESTILOS MEJORADOS PARA EL MODAL DE VISUALIZACIÓN ===== */
+
+/* Modal de detalles */
+.modal-content.detalles {
+    max-width: 800px;
+    padding: 30px 40px;
+    border-radius: 12px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+    background: linear-gradient(to bottom, #ffffff, #f8f9fa);
+}
+
+.modal-content.detalles h3 {
+    color: #2c3e50;
+    text-align: center;
+    font-size: 24px;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.detalles-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px 30px;
+}
+
+.detalle-item {
+    margin-bottom: 15px;
+    padding: 10px;
+    border-radius: 8px;
+    transition: background-color 0.2s ease;
+}
+
+.detalle-item:hover {
+    background-color: rgba(236, 240, 241, 0.7);
+}
+
+.detalle-item strong {
+    display: block;
+    margin-bottom: 8px;
+    color: #3498db;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.detalle-item span {
+    display: block;
+    padding: 8px 0;
+    color: #2c3e50;
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+/* Mejorar el estilo de la lista de componentes */
+.componentes-lista {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.componentes-lista li {
+    margin-bottom: 6px;
+    padding: 3px 0;
+    color: #2c3e50;
+}
+
+/* Contenedor de QR */
+.qr-container {
+    grid-column: span 2;
+    text-align: center;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 10px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+}
+
+.qr-container strong {
+    color: #3498db;
+    font-size: 16px;
+    margin-bottom: 15px;
+}
+
+.qr-container img {
+    max-width: 200px;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+    padding: 5px;
+    background-color: white;
+    margin: 10px auto;
+    transition: transform 0.2s ease;
+}
+
+.qr-container img:hover {
+    transform: scale(1.03);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+}
+
+/* Botón para descargar QR */
+.qr-container .btn-download {
+    display: inline-block;
+    margin-top: 15px;
+    padding: 10px 20px;
+    background-color: #3498db;
+    color: white;
+    text-decoration: none;
+    border-radius: 30px;
+    font-weight: 500;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.qr-container .btn-download:hover {
+    background-color: #2980b9;
+    box-shadow: 0 5px 12px rgba(0,0,0,0.2);
+    transform: translateY(-2px);
+}
+
+/* Botón de cierre mejorado para el modal de visualización */
+.close-view {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    width: 35px;
+    height: 35px;
+    background-color: #e74c3c;
+    color: white;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 35px;
+    font-size: 20px;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    transition: all 0.2s ease;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.close-view:hover {
+    background-color: #c0392b;
+    transform: rotate(90deg);
+}
+
+/* Estilos específicos para campos importantes */
+#view-nombreequipo, #view-serial, #view-estado {
+    font-weight: 600;
+}
+
+/* Estilo para estado según su valor */
+#view-estado[data-estado="Disponible"] {
+    color: #27ae60;
+}
+
+#view-estado[data-estado="Asignado"] {
+    color: #f39c12;
+}
+
+#view-estado[data-estado="Malogrado"] {
+    color: #e74c3c;
 }

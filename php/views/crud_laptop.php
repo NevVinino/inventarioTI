@@ -30,7 +30,7 @@ $cpus = sqlsrv_query($conn, $sql_cpu);
 $rams = sqlsrv_query($conn, $sql_ram);
 $almacenamientos = sqlsrv_query($conn, $sql_almacenamiento);
 
-// Lista de laptops con sus componentes
+// Mejorar la consulta para incluir la información completa de componentes
 $sql = "
 SELECT DISTINCT
     a.id_activo,
@@ -48,31 +48,54 @@ SELECT DISTINCT
     l.estadoGarantia,
     l.observaciones,
     m.nombre AS marca,
+    m.id_marca,
     ea.vestado_activo AS estado,
+    ea.id_estado_activo,
     e.nombre AS empresa,
+    e.id_empresa,
+    q.ruta_qr,
     (
         SELECT STRING_AGG(p.modelo + ' ' + ISNULL(p.generacion, ''), ', ')
         FROM laptop_procesador lp 
         JOIN procesador p ON lp.id_cpu = p.id_cpu 
         WHERE lp.id_laptop = l.id_laptop
-    ) as cpus,
+    ) as cpus_texto,
     (
         SELECT STRING_AGG(r.capacidad + ' ' + ISNULL(r.tipo, ''), ', ')
         FROM laptop_ram lr 
         JOIN RAM r ON lr.id_ram = r.id_ram 
         WHERE lr.id_laptop = l.id_laptop
-    ) as rams,
+    ) as rams_texto,
     (
         SELECT STRING_AGG(s.capacidad + ' ' + ISNULL(s.tipo, ''), ', ')
         FROM laptop_almacenamiento la 
         JOIN almacenamiento s ON la.id_almacenamiento = s.id_almacenamiento 
         WHERE la.id_laptop = l.id_laptop
-    ) as almacenamientos
+    ) as almacenamientos_texto,
+    (
+        SELECT STRING_AGG(CONCAT(p.id_cpu, '::', p.modelo + ' ' + ISNULL(p.generacion, '')), '||')
+        FROM laptop_procesador lp 
+        JOIN procesador p ON lp.id_cpu = p.id_cpu 
+        WHERE lp.id_laptop = l.id_laptop
+    ) as cpus_data,
+    (
+        SELECT STRING_AGG(CONCAT(r.id_ram, '::', r.capacidad + ' ' + ISNULL(r.tipo, '')), '||')
+        FROM laptop_ram lr 
+        JOIN RAM r ON lr.id_ram = r.id_ram 
+        WHERE lr.id_laptop = l.id_laptop
+    ) as rams_data,
+    (
+        SELECT STRING_AGG(CONCAT(s.id_almacenamiento, '::', s.capacidad + ' ' + ISNULL(s.tipo, '')), '||')
+        FROM laptop_almacenamiento la 
+        JOIN almacenamiento s ON la.id_almacenamiento = s.id_almacenamiento 
+        WHERE la.id_laptop = l.id_laptop
+    ) as almacenamientos_data
 FROM activo a
 INNER JOIN laptop l ON a.id_laptop = l.id_laptop
 LEFT JOIN marca m ON l.id_marca = m.id_marca
 LEFT JOIN estado_activo ea ON l.id_estado_activo = ea.id_estado_activo
 LEFT JOIN empresa e ON l.id_empresa = e.id_empresa
+LEFT JOIN qr_activo q ON a.id_activo = q.id_activo
 WHERE a.tipo_activo = 'Laptop'
 ";
 
@@ -80,6 +103,30 @@ $activos = sqlsrv_query($conn, $sql);
 if ($activos === false) {
     die("Error en consulta de activos: " . print_r(sqlsrv_errors(), true));
 }
+
+// Comprobar y mostrar el número de filas encontradas
+$hay_resultados = false;
+$num_filas = 0;
+$debug_info = "Iniciando verificación de filas...<br>";
+
+// Contar filas manualmente ya que sqlsrv_has_rows puede ser inconsistente
+$filas_temp = [];
+while ($fila = sqlsrv_fetch_array($activos, SQLSRV_FETCH_ASSOC)) {
+    $hay_resultados = true;
+    $num_filas++;
+    $filas_temp[] = $fila;
+}
+
+$debug_info .= "Total de filas encontradas: $num_filas<br>";
+
+// Si no hay resultados, mostrar mensaje
+if (!$hay_resultados) {
+    echo "<div class='alerta'>No se encontraron laptops registradas en la base de datos.</div>";
+    echo "<div class='debug-info'>$debug_info</div>";
+}
+
+// Restaurar el cursor para el bucle principal
+$activos = $filas_temp;
 ?>
 
 <!DOCTYPE html>
@@ -88,6 +135,7 @@ if ($activos === false) {
     <meta charset="UTF-8">
     <title>Gestión de Activos</title>
     <link rel="stylesheet" href="../../css/admin/crud_admin.css">
+    <!-- Eliminada la referencia a components.css ya que ahora está incluido en crud_admin.css -->
 </head>
 <body>
 
@@ -115,7 +163,7 @@ if ($activos === false) {
     </div>
 
     <!-- Modificar la tabla para incluir columna QR -->
-    <table id="tablaActivos">
+    <table id="tablaLaptops">
         <thead>
             <tr>
                 <th>N°</th>
@@ -133,37 +181,47 @@ if ($activos === false) {
         </thead>
         <tbody>
             <?php 
-            $counter = 1; // Añadir esta línea para inicializar el contador
-            while ($a = sqlsrv_fetch_array($activos, SQLSRV_FETCH_ASSOC)) { 
+            $counter = 1;
+            
+            // Si no hay resultados, mostrar una fila vacía indicando que no hay datos
+            if (count($activos) === 0) {
+                echo "<tr><td colspan='11' style='text-align:center;'>No se encontraron laptops registradas</td></tr>";
+            }
+            
+            foreach ($activos as $a) { 
                 $estado_clase = '';
-                switch(strtolower($a['estado'])) {
-                    case 'disponible':
-                        $estado_clase = 'estado-disponible';
-                        break;
-                    case 'asignado':
-                        $estado_clase = 'estado-asignado';
-                        break;
-                    case 'malogrado':
-                        $estado_clase = 'estado-malogrado';
-                        break;
+                // Determinar la clase CSS según el estado
+                if (isset($a['estado'])) {
+                    switch(strtolower($a['estado'])) {
+                        case 'disponible':
+                            $estado_clase = 'estado-disponible';
+                            break;
+                        case 'asignado':
+                            $estado_clase = 'estado-asignado';
+                            break;
+                        case 'malogrado':
+                            $estado_clase = 'estado-malogrado';
+                            break;
+                    }
                 }
-
-                // Usar la ruta de QR existente o generarla si no existe
-                $qr_path = $a['ruta_qr'];
                 
-                if (!$qr_path) {
-                    $qr_path = "img/qr/activo_" . $a['id_activo'] . ".png";
-                    
-                    // Generar QR solo si no existe el archivo
-                    if (!file_exists("../../" . $qr_path)) {
-                        include_once __DIR__ . '/../../phpqrcode/qrlib.php';
-                        // La URL que se codificará en el QR - Considera usar una URL absoluta
-                        $url_qr = BASE_URL . "/php/views/user/detalle_activo.php?id=" . $a['id_activo'];
-                        QRcode::png($url_qr, "../../" . $qr_path, QR_ECLEVEL_H, 10);
-                        
-                        // Actualizar la ruta en la base de datos
-                        $sql_qr = "INSERT INTO qr_activo (id_activo, ruta_qr) VALUES (?, ?)";
-                        sqlsrv_query($conn, $sql_qr, [$a['id_activo'], $qr_path]);
+                // Manejar fechas
+                $fecha_compra = "";
+                $fecha_garantia = "";
+                
+                if (isset($a['fechaCompra']) && $a['fechaCompra'] !== null) {
+                    if ($a['fechaCompra'] instanceof DateTime) {
+                        $fecha_compra = $a['fechaCompra']->format('Y-m-d');
+                    } elseif (is_array($a['fechaCompra']) && isset($a['fechaCompra']['date'])) {
+                        $fecha_compra = date('Y-m-d', strtotime($a['fechaCompra']['date']));
+                    }
+                }
+                
+                if (isset($a['garantia']) && $a['garantia'] !== null) {
+                    if ($a['garantia'] instanceof DateTime) {
+                        $fecha_garantia = $a['garantia']->format('Y-m-d');
+                    } elseif (is_array($a['garantia']) && isset($a['garantia']['date'])) {
+                        $fecha_garantia = date('Y-m-d', strtotime($a['garantia']['date']));
                     }
                 }
             ?>
@@ -171,16 +229,16 @@ if ($activos === false) {
                 <td><?= $counter++ ?></td>
                 <td><?= htmlspecialchars($a['nombreEquipo'] ?? '') ?></td>
                 <td><?= htmlspecialchars($a['modelo'] ?? '') ?></td>
-                <td><?= htmlspecialchars($a['numberSerial'] ?? '') ?></td>
-                <td><?= htmlspecialchars($a['MAC'] ?? '') ?></td>
+                <td><?= htmlspecialchars($a['numeroSerial'] ?? '') ?></td>
+                <td><?= htmlspecialchars($a['mac'] ?? '') ?></td>
                 <td><?= htmlspecialchars($a['numeroIP'] ?? '') ?></td>
                 <td class="estado-celda"><?= htmlspecialchars($a['estado'] ?? '') ?></td>
-                <td><?= htmlspecialchars($a['tipo'] ?? '') ?></td>
+                <td>Laptop</td>
                 <td><?= htmlspecialchars($a['marca'] ?? '') ?></td>
-                <td><?= htmlspecialchars($a['asistente'] ?? '') ?></td>
+                <td><?= htmlspecialchars($a['empresa'] ?? '') ?></td>
                 <td>
                     <div class="acciones">
-                        <!-- Botón ver (modificar para incluir data-qr) -->
+                        <!-- Botón ver -->
                         <button type="button" class="btn-icon btn-ver" 
                             data-nombreequipo="<?= htmlspecialchars($a['nombreEquipo'] ?? '') ?>"
                             data-modelo="<?= htmlspecialchars($a['modelo'] ?? '') ?>"
@@ -190,10 +248,13 @@ if ($activos === false) {
                             data-estado="<?= htmlspecialchars($a['estado'] ?? '') ?>"
                             data-tipo="Laptop"
                             data-marca="<?= htmlspecialchars($a['marca'] ?? '') ?>"
-                            data-cpu="<?= htmlspecialchars($a['cpus'] ?? '') ?>"
-                            data-ram="<?= htmlspecialchars($a['rams'] ?? '') ?>"
-                            data-almacenamiento="<?= htmlspecialchars($a['almacenamientos'] ?? '') ?>"
-                            data-qr="<?= $qr_path ?>"
+                            data-asistente="<?= htmlspecialchars($a['empresa'] ?? 'No asignado') ?>"
+                            data-cpu="<?= htmlspecialchars($a['cpus_texto'] ?? 'No especificado') ?>"
+                            data-ram="<?= htmlspecialchars($a['rams_texto'] ?? 'No especificado') ?>"
+                            data-almacenamiento="<?= htmlspecialchars($a['almacenamientos_texto'] ?? 'No especificado') ?>"
+                            <?php if(isset($a['ruta_qr']) && !empty($a['ruta_qr'])): ?>
+                            data-qr="<?= htmlspecialchars($a['ruta_qr']) ?>"
+                            <?php endif; ?>
                         >
                             <img src="../../img/ojo.png" alt="Ver">
                         </button>
@@ -203,10 +264,10 @@ if ($activos === false) {
                             data-id="<?= htmlspecialchars($a['id_activo']) ?>"
                             data-nombreequipo="<?= htmlspecialchars($a['nombreEquipo'] ?? '') ?>"
                             data-modelo="<?= htmlspecialchars($a['modelo'] ?? '') ?>"
-                            data-mac="<?= htmlspecialchars($a['MAC'] ?? '') ?>"
-                            data-serial="<?= htmlspecialchars($a['numberSerial'] ?? '') ?>"
-                            data-fechacompra="<?= ($a['fechaCompra'] instanceof DateTime) ? $a['fechaCompra']->format('Y-m-d') : '' ?>"
-                            data-garantia="<?= ($a['garantia'] instanceof DateTime) ? $a['garantia']->format('Y-m-d') : '' ?>"
+                            data-mac="<?= htmlspecialchars($a['mac'] ?? '') ?>"
+                            data-serial="<?= htmlspecialchars($a['numeroSerial'] ?? '') ?>"
+                            data-fechacompra="<?= htmlspecialchars($fecha_compra) ?>"
+                            data-garantia="<?= htmlspecialchars($fecha_garantia) ?>"
                             data-precio="<?= htmlspecialchars($a['precioCompra'] ?? '') ?>"
                             data-antiguedad="<?= htmlspecialchars($a['antiguedad'] ?? '') ?>"
                             data-orden="<?= htmlspecialchars($a['ordenCompra'] ?? '') ?>"
@@ -215,12 +276,15 @@ if ($activos === false) {
                             data-observaciones="<?= htmlspecialchars($a['observaciones'] ?? '') ?>"
                             data-marca="<?= htmlspecialchars($a['id_marca'] ?? '') ?>"
                             data-estadoactivo="<?= htmlspecialchars($a['id_estado_activo'] ?? '') ?>"
-                            data-tipoactivo="<?= htmlspecialchars($a['id_tipo_activo'] ?? '') ?>"
+                            data-empresa="<?= htmlspecialchars($a['id_empresa'] ?? '') ?>"
+                            data-cpus="<?= htmlspecialchars($a['cpus_data'] ?? '') ?>"
+                            data-rams="<?= htmlspecialchars($a['rams_data'] ?? '') ?>"
+                            data-almacenamientos="<?= htmlspecialchars($a['almacenamientos_data'] ?? '') ?>"
                         >
                             <img src="../../img/editar.png" alt="Editar">
                         </button>
 
-                        <?php if (strtolower($a['estado']) !== 'asignado'): ?>
+                        <?php if (!isset($a['estado']) || strtolower($a['estado']) !== 'asignado'): ?>
                             <!-- Botón eliminar (solo visible si no está asignado) -->
                             <form method="POST" action="../controllers/procesar_activo.php" onsubmit="return confirm('¿Eliminar este activo?');">
                                 <input type="hidden" name="accion" value="eliminar">
@@ -244,7 +308,7 @@ if ($activos === false) {
         <span class="close">&times;</span>
         <h3 id="modal-title">Registrar Laptop</h3>
         
-        <form id="formActivo" method="POST" action="../controllers/procesar_activo.php">
+        <form id="formActivo" method="POST" action="../controllers/procesar_laptop.php">
             <input type="hidden" name="accion" id="accion" value="crear">
             <input type="hidden" name="id_activo" id="id_activo">
             
@@ -413,15 +477,15 @@ if ($activos === false) {
                 <span id="view-marca"></span>
             </div>
             <div class="detalle-item">
-                <strong>Asistente:</strong>
+                <strong>Asistente TI:</strong>
                 <span id="view-asistente"></span>
             </div>
             <div class="detalle-item">
-                <strong>CPU:</strong>
+                <strong>Procesador:</strong>
                 <span id="view-cpu"></span>
             </div>
             <div class="detalle-item">
-                <strong>RAM:</strong>
+                <strong>Memoria RAM:</strong>
                 <span id="view-ram"></span>
             </div>
             <div class="detalle-item">
@@ -429,7 +493,7 @@ if ($activos === false) {
                 <span id="view-almacenamiento"></span>
             </div>
             <div class="detalle-item qr-container">
-                <strong>Código QR:</strong>
+                <strong>Código QR</strong>
                 <div id="view-qr"></div>
                 <a id="download-qr" href="#" download class="btn-download">
                     Descargar QR
@@ -439,7 +503,12 @@ if ($activos === false) {
     </div>
 </div>
 
-<script src="../../js/crud_laptop.js"></script>
+<script src="../../js/admin/crud_laptop.js"></script>
+
+</body></body><script src="../../js/admin/crud_admin.js"></script></div></div>
+
+</html>
+<script src="../../js/admin/crud_laptop.js"></script>
 
 </body>
 </html>
