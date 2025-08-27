@@ -162,7 +162,7 @@ $activos = $filas_temp;
         <button id="btnNuevo">+ NUEVO</button>
     </div>
 
-    <!-- Modificar la tabla para incluir columna QR -->
+    <!-- Tabla de laptops -->
     <table id="tablaLaptops">
         <thead>
             <tr>
@@ -176,6 +176,7 @@ $activos = $filas_temp;
                 <th>Tipo</th>
                 <th>Marca</th>
                 <th>Asistente TI</th>
+                <th>Opciones QR</th>
                 <th>Acciones</th>
             </tr>
         </thead>
@@ -185,7 +186,7 @@ $activos = $filas_temp;
             
             // Si no hay resultados, mostrar una fila vacía indicando que no hay datos
             if (count($activos) === 0) {
-                echo "<tr><td colspan='11' style='text-align:center;'>No se encontraron laptops registradas</td></tr>";
+                echo "<tr><td colspan='12' style='text-align:center;'>No se encontraron laptops registradas</td></tr>";
             }
             
             foreach ($activos as $a) { 
@@ -236,6 +237,27 @@ $activos = $filas_temp;
                 <td>Laptop</td>
                 <td><?= htmlspecialchars($a['marca'] ?? '') ?></td>
                 <td><?= htmlspecialchars($a['empresa'] ?? '') ?></td>
+                
+                <!-- Nueva columna Opciones QR -->
+                <td>
+                    <div class="opciones-qr">
+                        <?php if(isset($a['ruta_qr']) && !empty($a['ruta_qr'])): ?>
+                            <!-- QR ya existe, mostrar botón de descarga Y regenerar -->
+                            <a href="../../<?= htmlspecialchars($a['ruta_qr']) ?>" download class="btn-text btn-qr-download" data-id="<?= htmlspecialchars($a['id_activo']) ?>" title="Descargar código QR existente">
+                                Descargar QR
+                            </a>
+                            <button type="button" class="btn-text btn-qr-regenerate" data-id="<?= htmlspecialchars($a['id_activo']) ?>" title="Regenerar código QR">
+                                Regenerar QR
+                            </button>
+                        <?php else: ?>
+                            <!-- QR no existe, mostrar botón para generar -->
+                            <button type="button" class="btn-text btn-qr-generate" data-id="<?= htmlspecialchars($a['id_activo']) ?>" title="Generar nuevo código QR">
+                                Generar QR
+                            </button>
+                        <?php endif; ?>
+                    </div>
+                </td>
+                
                 <td>
                     <div class="acciones">
                         <!-- Botón ver -->
@@ -284,22 +306,6 @@ $activos = $filas_temp;
                         >
                             <img src="../../img/editar.png" alt="Editar">
                         </button>
-
-                        <!-- Botones QR -->
-                        <?php if(isset($a['ruta_qr']) && !empty($a['ruta_qr'])): ?>
-                            <!-- QR ya existe, mostrar botón de descarga Y regenerar -->
-                            <a href="../../<?= htmlspecialchars($a['ruta_qr']) ?>" download class="btn-text btn-qr-download" data-id="<?= htmlspecialchars($a['id_activo']) ?>" title="Descargar código QR existente">
-                                Descargar QR
-                            </a>
-                            <button type="button" class="btn-text btn-qr-regenerate" data-id="<?= htmlspecialchars($a['id_activo']) ?>" title="Regenerar código QR">
-                                Regenerar QR
-                            </button>
-                        <?php else: ?>
-                            <!-- QR no existe, mostrar botón para generar -->
-                            <button type="button" class="btn-text btn-qr-generate" data-id="<?= htmlspecialchars($a['id_activo']) ?>" title="Generar nuevo código QR">
-                                Generar QR
-                            </button>
-                        <?php endif; ?>
 
                         <?php if (!isset($a['estado']) || strtolower($a['estado']) !== 'asignado'): ?>
                             <!-- Botón eliminar (solo visible si no está asignado) -->
@@ -533,8 +539,8 @@ $activos = $filas_temp;
         font-size: 12px;
         font-weight: bold;
         text-decoration: none;
-        display: inline-block;
-        margin: 2px;
+        display: block;
+        margin: 2px 0;
         transition: background-color 0.3s ease;
         min-width: 90px;
         text-align: center;
@@ -562,6 +568,15 @@ $activos = $filas_temp;
     
     .btn-qr-download:hover {
         background-color: #45a049;
+    }
+    
+    /* Contenedor de opciones QR */
+    .opciones-qr {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        align-items: center;
+        min-width: 100px;
     }
     
     /* Hacer los iconos existentes más grandes */
@@ -651,6 +666,13 @@ $activos = $filas_temp;
         gap: 4px;
         flex-wrap: wrap;
         align-items: center;
+    }
+    
+    /* Ajustar el ancho de la columna QR */
+    #tablaLaptops th:nth-child(11),
+    #tablaLaptops td:nth-child(11) {
+        width: 120px;
+        text-align: center;
     }
 </style>
 

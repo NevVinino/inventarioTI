@@ -2,9 +2,9 @@
 
 /* CONTENEDOR GENERAL DEL CRUD */
 .main-container {
-    max-width: 1200px;
+    max-width: 1600px; /* antes 1200 */
     margin: 0 auto;
-    padding: 40px 20px;
+    padding: 40px 40px; /* antes 40px 20px */
 }
 
 /* TABLA DE ACTIVOS */
