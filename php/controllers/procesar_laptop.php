@@ -298,7 +298,26 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $id_tipo_activo = (isset($_POST["id_tipo_activo"]) && $_POST["id_tipo_activo"] !== '') ? $_POST["id_tipo_activo"] : null;
         $id_empresa = (isset($_POST["id_empresa"]) && $_POST["id_empresa"] !== '') ? $_POST["id_empresa"] : null;
 
+        // Debug logs - AGREGADO
+        if ($accion === "crear") {
+            error_log("=== DEBUG DATOS RECIBIDOS ===");
+            error_log("ID CPU recibido: " . ($id_cpu ?: 'NULL'));
+            error_log("POST id_cpu: " . ($_POST["id_cpu"] ?? 'NO ENVIADO'));
+            error_log("POST completo: " . print_r($_POST, true));
+        }
+
         if (in_array($accion, ['crear', 'editar'])) {
+            // Validate CPU requirement
+            if (!$id_cpu) {
+                error_log("Error: CPU no seleccionado. id_cpu = " . ($id_cpu ?: 'NULL'));
+                if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'error' => 'Debe seleccionar un procesador (CPU)']);
+                    exit;
+                }
+                die("❌ Error: Debe seleccionar un procesador (CPU).");
+            }
+            
             if ($fechaCompra && $fechaCompra > date('Y-m-d')) {
                 die("❌ Error: La fecha de compra no puede ser posterior a hoy.");
             }
@@ -392,26 +411,28 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             // Debug - guardar el ID en un log
             error_log("ID de laptop obtenido: " . $id_laptop);
 
-            // Insertar componentes
-            $cpus = isset($_POST['cpus']) ? array_filter(explode(',', $_POST['cpus'])) : [];
+            // Insert single CPU - CORREGIDO
+            if ($id_cpu) {
+                error_log("Insertando CPU ID: " . $id_cpu . " para laptop ID: " . $id_laptop);
+                $sql = "INSERT INTO laptop_procesador (id_laptop, id_cpu) VALUES (?, ?)";
+                $params = [(int)$id_laptop, (int)$id_cpu];
+                
+                $stmt_cpu = sqlsrv_query($conn, $sql, $params);
+                if ($stmt_cpu === false) {
+                    error_log("Error insertando CPU: " . print_r(sqlsrv_errors(), true));
+                    throw new Exception("Error inserting CPU: " . print_r(sqlsrv_errors(), true));
+                } else {
+                    error_log("CPU insertado exitosamente");
+                }
+            } else {
+                error_log("Advertencia: No se proporcionó ID de CPU");
+            }
+
+            // Insert components (RAM and Storage only)
             $rams = isset($_POST['rams']) ? array_filter(explode(',', $_POST['rams'])) : [];
             $almacenamientos = isset($_POST['almacenamientos']) ? array_filter(explode(',', $_POST['almacenamientos'])) : [];
 
-            // Insertar CPUs
-            foreach ($cpus as $cpu_id) {
-                $cpu_id = trim($cpu_id);
-                if (!empty($cpu_id) && is_numeric($cpu_id)) {
-                    $sql = "INSERT INTO laptop_procesador (id_laptop, id_cpu) VALUES (?, ?)";
-                    $params = [(int)$id_laptop, (int)$cpu_id];
-                    
-                    $stmt_cpu = sqlsrv_query($conn, $sql, $params);
-                    if ($stmt_cpu === false) {
-                        throw new Exception("Error inserting CPU: " . print_r(sqlsrv_errors(), true));
-                    }
-                }
-            }
-
-            // Insertar RAMs
+            // Insert RAMs
             foreach ($rams as $ram_id) {
                 $ram_id = trim($ram_id);
                 if (!empty($ram_id) && is_numeric($ram_id)) {
@@ -425,7 +446,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 }
             }
 
-            // Insertar Almacenamiento
+            // Insert Storage
             foreach ($almacenamientos as $almacenamiento_id) {
                 $almacenamiento_id = trim($almacenamiento_id);
                 if (!empty($almacenamiento_id) && is_numeric($almacenamiento_id)) {
@@ -533,27 +554,24 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     throw new Exception("Error updating laptop: " . print_r(sqlsrv_errors(), true));
                 }
 
-                // Actualizar componentes
-                $cpus = isset($_POST['cpus']) ? array_filter(explode(',', $_POST['cpus'])) : [];
+                // Update components
                 $rams = isset($_POST['rams']) ? array_filter(explode(',', $_POST['rams'])) : [];
                 $almacenamientos = isset($_POST['almacenamientos']) ? array_filter(explode(',', $_POST['almacenamientos'])) : [];
 
-                // Eliminar componentes existentes
+                // Delete existing components
                 sqlsrv_query($conn, "DELETE FROM laptop_procesador WHERE id_laptop = ?", [$id_laptop]);
                 sqlsrv_query($conn, "DELETE FROM laptop_ram WHERE id_laptop = ?", [$id_laptop]);
                 sqlsrv_query($conn, "DELETE FROM laptop_almacenamiento WHERE id_laptop = ?", [$id_laptop]);
 
-                // Insertar nuevos componentes
-                foreach ($cpus as $cpu_id) {
-                    $cpu_id = trim($cpu_id);
-                    if (!empty($cpu_id) && is_numeric($cpu_id)) {
-                        $sql = "INSERT INTO laptop_procesador (id_laptop, id_cpu) VALUES (?, ?)";
-                        if (sqlsrv_query($conn, $sql, [$id_laptop, $cpu_id]) === false) {
-                            throw new Exception("Error inserting CPU: " . print_r(sqlsrv_errors(), true));
-                        }
+                // Insert single CPU
+                if ($id_cpu) {
+                    $sql = "INSERT INTO laptop_procesador (id_laptop, id_cpu) VALUES (?, ?)";
+                    if (sqlsrv_query($conn, $sql, [$id_laptop, $id_cpu]) === false) {
+                        throw new Exception("Error inserting CPU: " . print_r(sqlsrv_errors(), true));
                     }
                 }
 
+                // Insert new RAM components
                 foreach ($rams as $ram_id) {
                     $ram_id = trim($ram_id);
                     if (!empty($ram_id) && is_numeric($ram_id)) {
@@ -564,6 +582,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     }
                 }
 
+                // Insert new Storage components
                 foreach ($almacenamientos as $almacenamiento_id) {
                     $almacenamiento_id = trim($almacenamiento_id);
                     if (!empty($almacenamiento_id) && is_numeric($almacenamiento_id)) {
@@ -573,6 +592,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         }
                     }
                 }
+            }
+            
+            // Intentar regenerar QR (si falla, no revertimos la edición; solo registramos)
+            $qr_after_edit = generarQR($id_activo, $conn);
+            if (!$qr_after_edit) {
+                error_log("Advertencia: no se pudo regenerar QR para activo ID: $id_activo");
             }
             
             sqlsrv_commit($conn);

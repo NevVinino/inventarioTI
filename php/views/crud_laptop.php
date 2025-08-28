@@ -402,15 +402,13 @@ $activos = $filas_temp;
                 <h4>Componentes</h4>
                 
                 <div class="componente-grupo">
-                    <label>Procesadores:</label>
-                    <select id="selectCPU" class="componente-select">
+                    <label>Procesador (CPU):</label>
+                    <select name="id_cpu" id="id_cpu" required>
                         <option value="">Seleccione un procesador...</option>
                         <?php while ($cpu = sqlsrv_fetch_array($cpus, SQLSRV_FETCH_ASSOC)): ?>
                             <option value="<?= $cpu['id_cpu'] ?>"><?= htmlspecialchars($cpu['descripcion']) ?></option>
                         <?php endwhile; ?>
                     </select>
-                    <button type="button" onclick="agregarComponente('CPU')">Agregar</button>
-                    <div id="cpuSeleccionados" class="componentes-seleccionados"></div>
                 </div>
 
                 <div class="componente-grupo">
@@ -440,8 +438,7 @@ $activos = $filas_temp;
                 </div>
             </div>
 
-            <!-- Agregar inputs ocultos para enviar los componentes seleccionados -->
-            <input type="hidden" name="cpus" id="cpusHidden">
+            <!-- Update hidden inputs - remove CPU hidden input since it's now a direct select -->
             <input type="hidden" name="rams" id="ramsHidden">
             <input type="hidden" name="almacenamientos" id="almacenamientosHidden">
 
@@ -516,156 +513,6 @@ $activos = $filas_temp;
         </div>
     </div>
 </div>
-
-<!-- CSS para el botón de QR dentro del head -->
-<style>
-    /* Estilos para botones de texto */
-    .btn-text {
-        background-color: #6a1b9a;
-        color: white;
-        border: none;
-        padding: 8px 12px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 12px;
-        font-weight: bold;
-        text-decoration: none;
-        display: block;
-        margin: 2px 0;
-        transition: background-color 0.3s ease;
-        min-width: 90px;
-        text-align: center;
-    }
-    
-    .btn-qr-generate {
-        background-color: #6a1b9a; /* Morado para generar */
-    }
-    
-    .btn-qr-generate:hover {
-        background-color: #9c27b0;
-    }
-    
-    .btn-qr-regenerate {
-        background-color: #ff9800; /* Naranja para regenerar */
-    }
-    
-    .btn-qr-regenerate:hover {
-        background-color: #f57c00;
-    }
-    
-    .btn-qr-download {
-        background-color: #4CAF50; /* Verde para descargar */
-    }
-    
-    .btn-qr-download:hover {
-        background-color: #45a049;
-    }
-    
-    /* Contenedor de opciones QR */
-    .opciones-qr {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        align-items: center;
-        min-width: 100px;
-    }
-    
-    /* Hacer los iconos existentes más grandes */
-    .btn-icon {
-        padding: 8px;
-        min-width: 36px;
-        min-height: 36px;
-    }
-    
-    .btn-icon img {
-        width: 20px;
-        height: 20px;
-    }
-    
-    .btn-toggle {
-        background-color: #007cba;
-        color: white;
-        border: none;
-        padding: 5px 10px;
-        border-radius: 3px;
-        cursor: pointer;
-        margin-left: 10px;
-    }
-    
-    .btn-toggle:hover {
-        background-color: #005a8b;
-    }
-    
-    /* Estilo para imagen QR en modal de visualización */
-    #view-qr img {
-        max-width: 200px;
-        max-height: 200px;
-    }
-    
-    .btn-download {
-        display: block;
-        text-align: center;
-        background-color: #4CAF50;
-        color: white;
-        padding: 8px 12px;
-        border-radius: 4px;
-        text-decoration: none;
-        margin-top: 10px;
-        width: fit-content;
-    }
-    
-    .btn-download:hover {
-        background-color: #45a049;
-    }
-    
-    .componente-tag {
-        display: inline-block;
-        background-color: #e7f3ff;
-        border: 1px solid #b8daff;
-        border-radius: 3px;
-        padding: 5px 8px;
-        margin: 2px;
-        font-size: 12px;
-    }
-    
-    .componente-tag .btn-eliminar-componente {
-        margin-left: 5px;
-        background-color: #dc3545;
-        color: white;
-        border: none;
-        border-radius: 2px;
-        cursor: pointer;
-        padding: 1px 4px;
-        font-size: 10px;
-    }
-    
-    .componente-tag .btn-eliminar-componente:hover {
-        background-color: #c82333;
-    }
-    
-    .componentes-seleccionados {
-        min-height: 30px;
-        border: 1px dashed #ccc;
-        padding: 5px;
-        margin-top: 5px;
-        border-radius: 3px;
-    }
-    
-    /* Mejorar la disposición de acciones */
-    .acciones {
-        display: flex;
-        gap: 4px;
-        flex-wrap: wrap;
-        align-items: center;
-    }
-    
-    /* Ajustar el ancho de la columna QR */
-    #tablaLaptops th:nth-child(11),
-    #tablaLaptops td:nth-child(11) {
-        width: 120px;
-        text-align: center;
-    }
-</style>
 
 <script src="../../js/admin/crud_laptop.js"></script>
 

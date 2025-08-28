@@ -34,19 +34,13 @@ document.addEventListener("DOMContentLoaded", function () {
         el.textContent = text;
     }
 
-    // --- configuración de componentes ---
-    const componentesSeleccionados = {
-        CPU: new Set(),
-        RAM: new Set(),
-        Almacenamiento: new Set()
-    };
-
     // --- toggle observaciones ---
     function configurarToggleObservaciones() {
         const btnToggle = document.getElementById("toggleObservaciones");
         const contenedor = document.getElementById("contenedorObservaciones");
         
         if (btnToggle && contenedor) {
+            // Remover listeners anteriores
             btnToggle.replaceWith(btnToggle.cloneNode(true));
             const nuevoBtn = document.getElementById("toggleObservaciones");
             
@@ -54,21 +48,42 @@ document.addEventListener("DOMContentLoaded", function () {
                 e.preventDefault();
                 e.stopPropagation();
                 
+                console.log("Toggle observaciones clickeado");
+                
                 if (contenedor.style.display === "none" || contenedor.style.display === "") {
                     contenedor.style.display = "block";
                     nuevoBtn.textContent = "Ocultar";
+                    console.log("Observaciones mostradas");
                 } else {
                     contenedor.style.display = "none";
                     nuevoBtn.textContent = "Mostrar";
+                    console.log("Observaciones ocultadas");
                 }
             });
             
             console.log("Toggle de observaciones configurado correctamente para PC");
+        } else {
+            console.error("Elementos de observaciones no encontrados:", {
+                btnToggle: !!btnToggle,
+                contenedor: !!contenedor
+            });
         }
     }
 
-    // Función global para agregar componentes
+    // --- configuración de componentes (solo para RAM y Almacenamiento) ---
+    const componentesSeleccionados = {
+        RAM: new Set(),
+        Almacenamiento: new Set()
+    };
+
+    // Función global para agregar componentes - ACTUALIZADA para excluir CPU
     window.agregarComponente = function (tipo) {
+        // CPU ya no se maneja aquí, solo RAM y Almacenamiento
+        if (tipo === 'CPU') {
+            console.warn('CPU ya no se maneja como componente múltiple en PC');
+            return;
+        }
+
         const select = document.getElementById(`select${tipo}`);
         const contenedor = document.getElementById(`${tipo.toLowerCase()}Seleccionados`);
         const hiddenInput = document.getElementById(`${tipo.toLowerCase()}sHidden`);
@@ -108,6 +123,9 @@ document.addEventListener("DOMContentLoaded", function () {
     };
 
     function actualizarHiddenInput(tipo) {
+        // Solo para RAM y Almacenamiento
+        if (tipo === 'CPU') return;
+        
         const hiddenInput = document.getElementById(`${tipo.toLowerCase()}sHidden`);
         if (hiddenInput) {
             const valores = Array.from(componentesSeleccionados[tipo]);
@@ -168,7 +186,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (fechaCompraInput) fechaCompraInput.addEventListener("change", calcularAntiguedad);
     if (garantiaInput) garantiaInput.addEventListener("change", calcularEstadoGarantia);
 
-    // --- abrir modal "Nuevo" ---
+    // --- abrir modal "Nuevo" - ACTUALIZADO ---
     if (btnNuevo) {
         btnNuevo.addEventListener("click", function () {
             if (!modal) return;
@@ -181,12 +199,15 @@ document.addEventListener("DOMContentLoaded", function () {
             if (form) form.reset();
             modal.querySelectorAll("input, select, textarea").forEach(el => el.disabled = false);
 
-            // Limpiar componentes seleccionados
-            componentesSeleccionados.CPU.clear();
+            // Limpiar componentes seleccionados (solo RAM y Almacenamiento)
             componentesSeleccionados.RAM.clear();
             componentesSeleccionados.Almacenamiento.clear();
 
-            ['CPU', 'RAM', 'Almacenamiento'].forEach(tipo => {
+            // Limpiar CPU select
+            const cpuSelect = document.getElementById('id_cpu');
+            if (cpuSelect) cpuSelect.value = '';
+
+            ['RAM', 'Almacenamiento'].forEach(tipo => {
                 const contenedor = document.getElementById(`${tipo.toLowerCase()}Seleccionados`);
                 if (contenedor) contenedor.innerHTML = '';
                 const hiddenInput = document.getElementById(`${tipo.toLowerCase()}sHidden`);
@@ -298,7 +319,7 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // --- editar activo ---
+    // --- editar activo - ACTUALIZADO ---
     document.querySelectorAll(".btn-editar").forEach(function (btn) {
         btn.addEventListener("click", function () {
             if (!modal) return;
@@ -338,6 +359,18 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (selectEmpresa) selectEmpresa.value = this.dataset.empresa;
             }
             
+            // Establecer CPU desde los datos (single select)
+            if (this.dataset.cpus) {
+                const cpuData = this.dataset.cpus.split('||')[0]; // Solo tomar el primer CPU
+                if (cpuData) {
+                    const [cpuId] = cpuData.split('::');
+                    const cpuSelect = document.getElementById('id_cpu');
+                    if (cpuSelect && cpuId) {
+                        cpuSelect.value = cpuId;
+                    }
+                }
+            }
+            
             // Verificar asignación
             verificarAsignacion(this.dataset.id);
             
@@ -356,14 +389,14 @@ document.addEventListener("DOMContentLoaded", function () {
             calcularAntiguedad();
             calcularEstadoGarantia();
             
-            // Limpiar y cargar componentes
-            ['CPU', 'RAM', 'Almacenamiento'].forEach(tipo => {
+            // Limpiar y cargar componentes (solo RAM y Almacenamiento)
+            ['RAM', 'Almacenamiento'].forEach(tipo => {
                 const contenedor = document.getElementById(`${tipo.toLowerCase()}Seleccionados`);
                 if (contenedor) contenedor.innerHTML = '';
                 componentesSeleccionados[tipo].clear();
             });
             
-            cargarComponentes('CPU', this.dataset.cpus);
+            // Cargar componentes desde los datos (excluir CPU)
             cargarComponentes('RAM', this.dataset.rams);
             cargarComponentes('Almacenamiento', this.dataset.almacenamientos);
             
@@ -373,9 +406,9 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
-    // Función para cargar componentes desde los datos
+    // Función para cargar componentes desde los datos - ACTUALIZADA
     function cargarComponentes(tipo, datos) {
-        if (!datos) return;
+        if (!datos || tipo === 'CPU') return; // CPU ya no se maneja aquí
         
         const contenedor = document.getElementById(`${tipo.toLowerCase()}Seleccionados`);
         
@@ -418,26 +451,33 @@ document.addEventListener("DOMContentLoaded", function () {
             .catch(error => console.error('Error verificando asignación:', error));
     }
 
-    // --- validación del formulario ---
+    // --- validación del formulario - ACTUALIZADA ---
     if (form) {
         form.addEventListener("submit", function(event) {
             event.preventDefault(); // Prevenir envío normal del formulario
             
             console.log("=== INICIANDO VALIDACIÓN PC ===");
             
-            // Validar componentes
-            const cpuHidden = document.getElementById("cpusHidden");
+            // Verificar CPU (single select)
+            const cpuSelect = document.getElementById('id_cpu');
+            if (!cpuSelect || !cpuSelect.value) {
+                alert("Debe seleccionar un procesador (CPU)");
+                if (cpuSelect) cpuSelect.focus();
+                return false;
+            }
+            
+            // Validar componentes (solo RAM y Almacenamiento)
             const ramHidden = document.getElementById("ramsHidden");
             const almacenamientoHidden = document.getElementById("almacenamientosHidden");
             
-            let cpuValido = componentesSeleccionados.CPU.size > 0 || (cpuHidden?.value && cpuHidden.value.trim() !== '');
             let ramValido = componentesSeleccionados.RAM.size > 0 || (ramHidden?.value && ramHidden.value.trim() !== '');
             let almacenamientoValido = componentesSeleccionados.Almacenamiento.size > 0 || (almacenamientoHidden?.value && almacenamientoHidden.value.trim() !== '');
             
-            if (!cpuValido) {
-                alert("Debe agregar al menos un procesador (CPU)");
-                return false;
-            }
+            console.log("Validación de componentes PC:", {
+                cpuValido: !!cpuSelect.value,
+                ramValido,
+                almacenamientoValido
+            });
             
             if (!ramValido) {
                 alert("Debe agregar al menos una memoria RAM");
@@ -472,7 +512,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 return false;
             }
             
-            console.log("=== VALIDACIÓN EXITOSA - ENVIANDO VIA AJAX ===");
+            console.log("=== VALIDACIÓN PC EXITOSA - ENVIANDO VIA AJAX ===");
             
             // Deshabilitar el botón de envío para evitar múltiples envíos
             const submitBtn = form.querySelector('button[type="submit"]');
