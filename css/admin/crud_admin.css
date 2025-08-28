@@ -675,3 +675,30 @@ textarea#observaciones {
     width: 120px;
     text-align: center;
 }
+
+/* ===== ALERTAS DE ÉXITO Y ERROR ===== */
+.alerta-error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    padding: 12px 20px;
+    margin: 20px auto;
+    width: 80%;
+    text-align: center;
+    border-radius: 5px;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.alerta-exito {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+    padding: 12px 20px;
+    margin: 20px auto;
+    width: 80%;
+    text-align: center;
+    border-radius: 5px;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
