@@ -421,6 +421,10 @@ document.addEventListener("DOMContentLoaded", function () {
     // --- validación del formulario ---
     if (form) {
         form.addEventListener("submit", function(event) {
+            event.preventDefault(); // Prevenir envío normal del formulario
+            
+            console.log("=== INICIANDO VALIDACIÓN SERVIDOR ===");
+            
             // Validar componentes
             const cpuHidden = document.getElementById("cpusHidden");
             const ramHidden = document.getElementById("ramsHidden");
@@ -431,19 +435,16 @@ document.addEventListener("DOMContentLoaded", function () {
             let almacenamientoValido = componentesSeleccionados.Almacenamiento.size > 0 || (almacenamientoHidden?.value && almacenamientoHidden.value.trim() !== '');
             
             if (!cpuValido) {
-                event.preventDefault();
                 alert("Debe agregar al menos un procesador (CPU)");
                 return false;
             }
             
             if (!ramValido) {
-                event.preventDefault();
                 alert("Debe agregar al menos una memoria RAM");
                 return false;
             }
             
             if (!almacenamientoValido) {
-                event.preventDefault();
                 alert("Debe agregar al menos un dispositivo de almacenamiento");
                 return false;
             }
@@ -454,27 +455,88 @@ document.addEventListener("DOMContentLoaded", function () {
             const serial = document.getElementById("numberSerial");
             
             if (!nombreEquipo.value.trim()) {
-                event.preventDefault();
                 alert("El nombre del equipo es obligatorio");
                 nombreEquipo.focus();
                 return false;
             }
             
             if (!modelo.value.trim()) {
-                event.preventDefault();
                 alert("El modelo es obligatorio");
                 modelo.focus();
                 return false;
             }
             
             if (!serial.value.trim()) {
-                event.preventDefault();
                 alert("El número de serie es obligatorio");
                 serial.focus();
                 return false;
             }
             
-            return true;
+            console.log("=== VALIDACIÓN EXITOSA - ENVIANDO VIA AJAX ===");
+            
+            // Deshabilitar el botón de envío para evitar múltiples envíos
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Guardando...';
+            
+            // Recopilar datos del formulario
+            const formData = new FormData(form);
+            
+            // Enviar vía AJAX con headers apropiados
+            fetch('../controllers/procesar_servidor.php', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData
+            })
+            .then(response => {
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    return response.json();
+                }
+                return response.text();
+            })
+            .then(data => {
+                console.log('Respuesta del servidor:', data);
+                
+                // Si es una respuesta JSON (error de validación)
+                if (typeof data === 'object' && data.error) {
+                    alert('❌ Error: ' + data.error);
+                    return;
+                }
+                
+                // Si es texto, verificar errores de formato anterior
+                if (typeof data === 'string') {
+                    if (data.includes('❌ Error:')) {
+                        const errorMatch = data.match(/❌ Error: (.+?)(?:\.|$)/);
+                        const errorMessage = errorMatch ? errorMatch[1] : 'Error desconocido';
+                        alert('❌ Error: ' + errorMessage);
+                    } else if (data.includes('Error:')) {
+                        const errorMatch = data.match(/Error: (.+?)(?:\.|$)/);
+                        const errorMessage = errorMatch ? errorMatch[1] : 'Error desconocido';
+                        alert('Error: ' + errorMessage);
+                    } else {
+                        // Si no hay errores, redirigir
+                        window.location.href = '../views/crud_servidor.php?success=1';
+                    }
+                } else {
+                    // Para respuestas JSON exitosas
+                    window.location.href = '../views/crud_servidor.php?success=1';
+                }
+            })
+            .catch(error => {
+                console.error('Error en la petición:', error);
+                alert('Error al comunicarse con el servidor: ' + error.message);
+            })
+            .finally(() => {
+                // Rehabilitar el botón
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            });
+            
+            return false;
         });
     }
 

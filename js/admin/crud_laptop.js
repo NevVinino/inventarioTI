@@ -497,6 +497,8 @@ document.addEventListener("DOMContentLoaded", function () {
     // --- validación del formulario - CORREGIDA ---
     if (form) {
         form.addEventListener("submit", function(event) {
+            event.preventDefault(); // Prevenir envío normal del formulario
+            
             console.log("=== INICIANDO VALIDACIÓN ===");
             
             // Verificar estado actual de componentes
@@ -538,21 +540,18 @@ document.addEventListener("DOMContentLoaded", function () {
             });
             
             if (!cpuValido) {
-                event.preventDefault();
                 alert("Debe agregar al menos un procesador (CPU)");
                 console.log("Validación fallida: CPU");
                 return false;
             }
             
             if (!ramValido) {
-                event.preventDefault();
                 alert("Debe agregar al menos una memoria RAM");
                 console.log("Validación fallida: RAM");
                 return false;
             }
             
             if (!almacenamientoValido) {
-                event.preventDefault();
                 alert("Debe agregar al menos un dispositivo de almacenamiento");
                 console.log("Validación fallida: Almacenamiento");
                 return false;
@@ -564,28 +563,70 @@ document.addEventListener("DOMContentLoaded", function () {
             const serial = document.getElementById("numberSerial");
             
             if (!nombreEquipo.value.trim()) {
-                event.preventDefault();
                 alert("El nombre del equipo es obligatorio");
                 nombreEquipo.focus();
                 return false;
             }
             
             if (!modelo.value.trim()) {
-                event.preventDefault();
                 alert("El modelo es obligatorio");
                 modelo.focus();
                 return false;
             }
             
             if (!serial.value.trim()) {
-                event.preventDefault();
                 alert("El número de serie es obligatorio");
                 serial.focus();
                 return false;
             }
             
-            console.log("=== VALIDACIÓN EXITOSA ===");
-            return true;
+            console.log("=== VALIDACIÓN EXITOSA - ENVIANDO VIA AJAX ===");
+            
+            // Deshabilitar el botón de envío para evitar múltiples envíos
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Guardando...';
+            
+            // Recopilar datos del formulario
+            const formData = new FormData(form);
+            
+            // Enviar vía AJAX
+            fetch('../controllers/procesar_laptop.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(text => {
+                console.log('Respuesta del servidor:', text);
+                
+                // Verificar si la respuesta contiene un error
+                if (text.includes('❌ Error:')) {
+                    // Extraer el mensaje de error
+                    const errorMatch = text.match(/❌ Error: (.+?)(?:\.|$)/);
+                    const errorMessage = errorMatch ? errorMatch[1] : 'Error desconocido';
+                    alert('❌ Error: ' + errorMessage);
+                } else if (text.includes('Error:')) {
+                    // Manejar otros tipos de errores
+                    const errorMatch = text.match(/Error: (.+?)(?:\.|$)/);
+                    const errorMessage = errorMatch ? errorMatch[1] : 'Error desconocido';
+                    alert('Error: ' + errorMessage);
+                } else {
+                    // Si no hay errores, redirigir directamente sin mostrar alerta
+                    window.location.href = '../views/crud_laptop.php?success=1';
+                }
+            })
+            .catch(error => {
+                console.error('Error en la petición:', error);
+                alert('Error al comunicarse con el servidor: ' + error.message);
+            })
+            .finally(() => {
+                // Rehabilitar el botón
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            });
+            
+            return false;
         });
     }
 

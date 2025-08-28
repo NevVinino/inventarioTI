@@ -56,7 +56,7 @@ function generarQR($id_activo, $conn) {
     }
 
     // Generar nombre único para el archivo QR
-    $qr_filename = "activo_" . $id_activo . "_" . time() . ".png";
+    $qr_filename = "laptop_" . $id_activo . "_" . time() . ".png";
     $qr_path = "img/qr/" . $qr_filename; // Ruta relativa para BD
     $filepath = $qr_dir . '/' . $qr_filename; // Ruta absoluta para archivo
     
@@ -318,6 +318,31 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
 
     if ($accion === "crear") {
+        // Validar que el número de serie no exista
+        $sql_check_serial = "SELECT COUNT(*) as count FROM laptop WHERE numeroSerial = ?";
+        $stmt_check_serial = sqlsrv_query($conn, $sql_check_serial, [$numberSerial]);
+        
+        if ($stmt_check_serial === false) {
+            // Verificar si es una petición AJAX
+            if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => 'Error al verificar número de serie en la base de datos']);
+                exit;
+            }
+            die("❌ Error al verificar número de serie: " . print_r(sqlsrv_errors(), true));
+        }
+        
+        $row_serial = sqlsrv_fetch_array($stmt_check_serial, SQLSRV_FETCH_ASSOC);
+        if ($row_serial['count'] > 0) {
+            // Verificar si es una petición AJAX
+            if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => "El número de serie '$numberSerial' ya existe en la base de datos. Por favor, ingrese un número de serie único."]);
+                exit;
+            }
+            die("❌ Error: El número de serie '$numberSerial' ya existe en la base de datos. Por favor, ingrese un número de serie único.");
+        }
+        
         // Start transaction
         sqlsrv_begin_transaction($conn);
         try {
@@ -446,6 +471,33 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             die("Error: " . $e->getMessage());
         }
     } elseif ($accion === "editar" && !empty($id_activo)) {
+        // Validar que el número de serie no exista en otro laptop
+        $sql_check_serial = "SELECT COUNT(*) as count FROM laptop l 
+                            INNER JOIN activo a ON l.id_laptop = a.id_laptop 
+                            WHERE l.numeroSerial = ? AND a.id_activo != ?";
+        $stmt_check_serial = sqlsrv_query($conn, $sql_check_serial, [$numberSerial, $id_activo]);
+        
+        if ($stmt_check_serial === false) {
+            // Verificar si es una petición AJAX
+            if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => 'Error al verificar número de serie en la base de datos']);
+                exit;
+            }
+            die("❌ Error al verificar número de serie: " . print_r(sqlsrv_errors(), true));
+        }
+        
+        $row_serial = sqlsrv_fetch_array($stmt_check_serial, SQLSRV_FETCH_ASSOC);
+        if ($row_serial['count'] > 0) {
+            // Verificar si es una petición AJAX
+            if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => "El número de serie '$numberSerial' ya existe en otro laptop. Por favor, ingrese un número de serie único."]);
+                exit;
+            }
+            die("❌ Error: El número de serie '$numberSerial' ya existe en otro laptop. Por favor, ingrese un número de serie único.");
+        }
+        
         // Iniciar transacción para manejar componentes
         sqlsrv_begin_transaction($conn);
         // Intentar regenerar QR (si falla, no revertimos la edición; solo registramos)

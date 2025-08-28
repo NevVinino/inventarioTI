@@ -107,7 +107,6 @@ if ($activos === false) {
 // Comprobar y mostrar el número de filas encontradas
 $hay_resultados = false;
 $num_filas = 0;
-$debug_info = "Iniciando verificación de filas...<br>";
 
 // Contar filas manualmente ya que sqlsrv_has_rows puede ser inconsistente
 $filas_temp = [];
@@ -115,14 +114,6 @@ while ($fila = sqlsrv_fetch_array($activos, SQLSRV_FETCH_ASSOC)) {
     $hay_resultados = true;
     $num_filas++;
     $filas_temp[] = $fila;
-}
-
-$debug_info .= "Total de filas encontradas: $num_filas<br>";
-
-// Si no hay resultados, mostrar mensaje
-if (!$hay_resultados) {
-    echo "<div class='alerta'>No se encontraron laptops registradas en la base de datos.</div>";
-    echo "<div class='debug-info'>$debug_info</div>";
 }
 
 // Restaurar el cursor para el bucle principal
