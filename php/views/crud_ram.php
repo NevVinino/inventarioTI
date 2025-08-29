@@ -8,6 +8,13 @@ $sqlRams = "SELECT r.id_ram, r.capacidad, m.nombre as marca, r.tipo, r.frecuenci
      FROM RAM r
      INNER JOIN marca m ON r.id_marca = m.id_marca";
 $rams = sqlsrv_query($conn, $sqlRams);
+
+// Obtener marcas filtradas por tipo "RAM"
+$sqlMarcasRAM = "SELECT m.*, tm.nombre as tipo_marca_nombre 
+                 FROM marca m 
+                 INNER JOIN tipo_marca tm ON m.id_tipo_marca = tm.id_tipo_marca 
+                 WHERE LOWER(tm.nombre) = 'ram'";
+$marcasRAM = sqlsrv_query($conn, $sqlMarcasRAM);
 ?>
 <!DOCTYPE html>
 <html>
@@ -97,13 +104,21 @@ $rams = sqlsrv_query($conn, $sqlRams);
 
                         <label>Marca:</label>
                         <select name="id_marca" id="id_marca" required>
-                            <?php
-                            $sqlMarcas = "SELECT id_marca, nombre FROM marca";
-                            $marcas = sqlsrv_query($conn, $sqlMarcas);
-                            while ($marca = sqlsrv_fetch_array($marcas, SQLSRV_FETCH_ASSOC)) {
-                                echo "<option value='" . $marca['id_marca'] . "'>" . $marca['nombre'] . "</option>";
+                            <option value="">Seleccione una marca...</option>
+                            <?php 
+                            // Obtener marcas de RAM para el dropdown
+                            $marcasRAMArray = [];
+                            while ($marca = sqlsrv_fetch_array($marcasRAM, SQLSRV_FETCH_ASSOC)) {
+                                $marcasRAMArray[] = $marca;
                             }
-                            ?>
+                            
+                            if (empty($marcasRAMArray)) { ?>
+                                <option value="">No hay marcas de tipo "RAM" disponibles</option>
+                            <?php } else {
+                                foreach ($marcasRAMArray as $marca) { ?>
+                                    <option value="<?= $marca['id_marca'] ?>"><?= htmlspecialchars($marca['nombre']) ?></option>
+                                <?php }
+                            } ?>
                         </select>
 
                         <label>Tipo:</label>
@@ -120,6 +135,34 @@ $rams = sqlsrv_query($conn, $sqlRams);
                 </div>
             </div>
         </div>
+
+        <!-- Script para debug -->
+        <script>
+            // Cargar marcas de RAM para JavaScript
+            <?php 
+            // Reset query para JavaScript
+            $marcasRAM2 = sqlsrv_query($conn, "SELECT m.*, tm.nombre as tipo_marca_nombre 
+                                               FROM marca m 
+                                               INNER JOIN tipo_marca tm ON m.id_tipo_marca = tm.id_tipo_marca 
+                                               WHERE LOWER(tm.nombre) = 'ram'");
+            $marcasArray = [];
+            while ($m = sqlsrv_fetch_array($marcasRAM2, SQLSRV_FETCH_ASSOC)) {
+                $marcasArray[] = $m;
+            }
+            ?>
+            window.marcasRAM = <?= json_encode($marcasArray) ?>;
+            
+            console.log('=== DEBUG RAM ===');
+            console.log('Marcas de RAM cargadas:', window.marcasRAM);
+            
+            if (window.marcasRAM.length === 0) {
+                console.warn('⚠️ No se encontraron marcas de tipo "RAM"');
+                console.log('💡 Asegúrate de tener:');
+                console.log('1. Un tipo_marca con nombre "ram" en la tabla tipo_marca');
+                console.log('2. Marcas asociadas a ese tipo_marca en la tabla marca');
+            }
+        </script>
+
         <script src="../../js/admin/crud_ram.js"></script>
     </body>
 </html>

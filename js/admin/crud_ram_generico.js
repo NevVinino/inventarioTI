@@ -1,11 +1,11 @@
 document.addEventListener("DOMContentLoaded", function () {
-    const modal = document.getElementById("modalMarca");
+    const modal = document.getElementById("modalRAM");
     const btnNuevo = document.getElementById("btnNuevo");
     const spanClose = document.querySelector(".close");
-    const form = document.getElementById("formMarca");
+    const form = document.getElementById("formRAM");
 
     btnNuevo.addEventListener("click", function () {
-        document.getElementById("modal-title").textContent = "Registrar Marca";
+        document.getElementById("modal-title").textContent = "Registrar RAM Genérica";
         document.getElementById("accion").value = "crear";
         form.reset();
         modal.style.display = "block";
@@ -23,19 +23,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
     document.querySelectorAll(".btn-editar").forEach(function (btn) {
         btn.addEventListener("click", function () {
-            document.getElementById("modal-title").textContent = "Editar Marca";
+            document.getElementById("modal-title").textContent = "Editar RAM Genérica";
             document.getElementById("accion").value = "editar";
 
-            document.getElementById("id_marca").value = btn.dataset.id;
-            document.getElementById("nombre").value = btn.dataset.nombre;
-            document.getElementById("id_tipo_marca").value = btn.dataset.idTipoMarca;
+            document.getElementById("id_ram_generico").value = btn.dataset.id;
+            document.getElementById("capacidad").value = btn.dataset.capacidad;
 
             modal.style.display = "block";
         });
     });
 
     const buscador = document.getElementById("buscador");
-    const filas = document.querySelectorAll("#tablaMarcas tbody tr");
+    const filas = document.querySelectorAll("#tablaRAMs tbody tr");
 
     buscador.addEventListener("input", function () {
         const valor = buscador.value.toLowerCase();

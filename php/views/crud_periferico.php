@@ -5,14 +5,20 @@ include("../includes/verificar_acceso.php");
 
 // Consultar listas desplegables
 $tipos = sqlsrv_query($conn, "SELECT * FROM tipo_periferico");
-$marcas = sqlsrv_query($conn, "SELECT * FROM marca");
+$marcas = sqlsrv_query($conn, "SELECT m.*, tm.nombre as tipo_marca_nombre FROM marca m INNER JOIN tipo_marca tm ON m.id_tipo_marca = tm.id_tipo_marca");
 $condiciones = sqlsrv_query($conn, "SELECT * FROM condicion_periferico");
+
+// Obtener tipos de marca para crear el mapeo
+$tiposMarca = sqlsrv_query($conn, "SELECT * FROM tipo_marca");
 
 // Obtener perifericos con JOIN para mostrar nombres
 $sql = "SELECT p.id_periferico, 
                tp.vtipo_periferico, 
                m.nombre AS marca, 
-               cp.vcondicion_periferico
+               cp.vcondicion_periferico,
+               p.id_tipo_periferico,
+               p.id_marca,
+               p.id_condicion_periferico
         FROM periferico p
         JOIN tipo_periferico tp ON p.id_tipo_periferico = tp.id_tipo_periferico
         JOIN marca m ON p.id_marca = m.id_marca
@@ -79,9 +85,9 @@ function estaAsignado($conn, $id_periferico) {
                             <div class="acciones">
                                 <button type="button" class="btn-icon btn-editar"
                                     data-id="<?= $p['id_periferico'] ?>"
-                                    data-tipo="<?= $p['vtipo_periferico'] ?>"
-                                    data-marca="<?= $p['marca'] ?>"
-                                    data-condicion="<?= $p['vcondicion_periferico'] ?>">
+                                    data-id-tipo="<?= $p['id_tipo_periferico'] ?>"
+                                    data-id-marca="<?= $p['id_marca'] ?>"
+                                    data-id-condicion="<?= $p['id_condicion_periferico'] ?>">
                                     <img src="../../img/editar.png" alt="Editar">
                                 </button>
                                 <form method="POST" action="../controllers/procesar_periferico.php" 
@@ -111,23 +117,32 @@ function estaAsignado($conn, $id_periferico) {
                     <label>Tipo de Periférico:</label>
                     <select name="id_tipo_periferico" id="id_tipo_periferico" required>
                         <option value="">Seleccione...</option>
-                        <?php while ($tp = sqlsrv_fetch_array($tipos, SQLSRV_FETCH_ASSOC)) { ?>
+                        <?php 
+                        // Reset pointer for tipos
+                        $tiposArray = [];
+                        while ($tp = sqlsrv_fetch_array($tipos, SQLSRV_FETCH_ASSOC)) {
+                            $tiposArray[] = $tp;
+                        }
+                        foreach ($tiposArray as $tp) { ?>
                             <option value="<?= $tp['id_tipo_periferico'] ?>"><?= $tp['vtipo_periferico'] ?></option>
                         <?php } ?>
                     </select>
 
                     <label>Marca:</label>
                     <select name="id_marca" id="id_marca" required>
-                        <option value="">Seleccione...</option>
-                        <?php while ($m = sqlsrv_fetch_array($marcas, SQLSRV_FETCH_ASSOC)) { ?>
-                            <option value="<?= $m['id_marca'] ?>"><?= $m['nombre'] ?></option>
-                        <?php } ?>
+                        <option value="">Primero seleccione un tipo de periférico</option>
                     </select>
 
                     <label>Condición:</label>
                     <select name="id_condicion_periferico" id="id_condicion_periferico" required>
                         <option value="">Seleccione...</option>
-                        <?php while ($c = sqlsrv_fetch_array($condiciones, SQLSRV_FETCH_ASSOC)) { ?>
+                        <?php 
+                        // Reset pointer for condiciones
+                        $condicionesArray = [];
+                        while ($c = sqlsrv_fetch_array($condiciones, SQLSRV_FETCH_ASSOC)) {
+                            $condicionesArray[] = $c;
+                        }
+                        foreach ($condicionesArray as $c) { ?>
                             <option value="<?= $c['id_condicion_periferico'] ?>"><?= $c['vcondicion_periferico'] ?></option>
                         <?php } ?>
                     </select>
@@ -138,8 +153,76 @@ function estaAsignado($conn, $id_periferico) {
         </div>
     </div>
 
+    <!-- Script para pasar datos de marcas a JavaScript -->
+    <script>
+        // Cargar todas las marcas con su tipo_marca
+        <?php 
+        $marcas2 = sqlsrv_query($conn, "SELECT m.*, tm.nombre as tipo_marca_nombre FROM marca m INNER JOIN tipo_marca tm ON m.id_tipo_marca = tm.id_tipo_marca");
+        $marcasArray = [];
+        while ($m = sqlsrv_fetch_array($marcas2, SQLSRV_FETCH_ASSOC)) {
+            $marcasArray[] = $m;
+        }
+        ?>
+        window.marcasData = <?= json_encode($marcasArray) ?>;
+        
+        // Cargar tipos de marca
+        <?php 
+        $tiposMarca2 = sqlsrv_query($conn, "SELECT * FROM tipo_marca");
+        $tiposMarcaArray = [];
+        while ($tm = sqlsrv_fetch_array($tiposMarca2, SQLSRV_FETCH_ASSOC)) {
+            $tiposMarcaArray[] = $tm;
+        }
+        ?>
+        window.tiposMarcaData = <?= json_encode($tiposMarcaArray) ?>;
+        
+        // Cargar tipos de periférico
+        <?php 
+        $tiposPeriferico2 = sqlsrv_query($conn, "SELECT * FROM tipo_periferico");
+        $tiposPerifericoArray = [];
+        while ($tp = sqlsrv_fetch_array($tiposPeriferico2, SQLSRV_FETCH_ASSOC)) {
+            $tiposPerifericoArray[] = $tp;
+        }
+        ?>
+        window.tiposPerifericoData = <?= json_encode($tiposPerifericoArray) ?>;
+        
+        // Función para crear mapeo dinámico basado en similitud de nombres
+        window.createDynamicMapping = function() {
+            const mapping = {};
+            
+            // Para cada tipo de periférico, buscar el tipo de marca correspondiente
+            window.tiposPerifericoData.forEach(tipoPeriferico => {
+                const nombrePeriferico = tipoPeriferico.vtipo_periferico.toLowerCase().trim();
+                
+                // Buscar tipo_marca con nombre similar
+                const tipoMarcaEncontrado = window.tiposMarcaData.find(tipoMarca => {
+                    const nombreTipoMarca = tipoMarca.nombre.toLowerCase().trim();
+                    
+                    // Comparación exacta o similitud
+                    return nombrePeriferico === nombreTipoMarca || 
+                           nombrePeriferico.includes(nombreTipoMarca) ||
+                           nombreTipoMarca.includes(nombrePeriferico);
+                });
+                
+                if (tipoMarcaEncontrado) {
+                    mapping[tipoPeriferico.id_tipo_periferico] = tipoMarcaEncontrado.id_tipo_marca;
+                    console.log(`Mapeo creado: ${nombrePeriferico} (ID: ${tipoPeriferico.id_tipo_periferico}) -> ${tipoMarcaEncontrado.nombre} (ID: ${tipoMarcaEncontrado.id_tipo_marca})`);
+                } else {
+                    console.warn(`No se encontró tipo de marca para: ${nombrePeriferico}`);
+                }
+            });
+            
+            return mapping;
+        };
+        
+        // Crear el mapeo dinámico
+        window.tipoPerifericoToTipoMarca = window.createDynamicMapping();
+        
+        console.log('Mapeo dinámico creado:', window.tipoPerifericoToTipoMarca);
+        console.log('Tipos de periférico disponibles:', window.tiposPerifericoData);
+        console.log('Tipos de marca disponibles:', window.tiposMarcaData);
+        console.log('Marcas disponibles:', window.marcasData);
+    </script>
+
     <script src="../../js/admin/crud_periferico.js"></script>
-</body>
-</html>
 </body>
 </html>

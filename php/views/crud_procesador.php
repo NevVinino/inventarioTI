@@ -5,10 +5,17 @@ $solo_admin = true;
 include("../includes/verificar_acceso.php");
 
 // Obtener lista de procesadores
-$sqlProcesadores = "SELECT p.id_cpu, p.modelo, m.nombre as marca, m.id_marca, p.generacion, p.nucleos, p.hilos, p.part_number
+$sqlProcesadores = "SELECT p.id_procesador, p.modelo, m.nombre as marca, m.id_marca, p.generacion, p.nucleos, p.hilos, p.part_number
      FROM procesador p
      INNER JOIN marca m ON p.id_marca = m.id_marca";
 $procesadores = sqlsrv_query($conn, $sqlProcesadores);
+
+// Obtener marcas filtradas por tipo "Procesador"
+$sqlMarcasProcesador = "SELECT m.*, tm.nombre as tipo_marca_nombre 
+                       FROM marca m 
+                       INNER JOIN tipo_marca tm ON m.id_tipo_marca = tm.id_tipo_marca 
+                       WHERE LOWER(tm.nombre) = 'procesador'";
+$marcasProcesador = sqlsrv_query($conn, $sqlMarcasProcesador);
 ?>
 <!DOCTYPE html>
 <html>
@@ -66,7 +73,7 @@ $procesadores = sqlsrv_query($conn, $sqlProcesadores);
                             <td>
                                 <div class="acciones">
                                     <button type="button" class="btn-icon btn-editar"
-                                        data-id="<?= $p['id_cpu'] ?>"
+                                        data-id="<?= $p['id_procesador'] ?>"
                                         data-modelo="<?= htmlspecialchars($p['modelo']) ?>"
                                         data-id-marca="<?= htmlspecialchars($p['id_marca']) ?>"
                                         data-generacion="<?= htmlspecialchars($p['generacion']) ?>"
@@ -77,7 +84,7 @@ $procesadores = sqlsrv_query($conn, $sqlProcesadores);
                                     </button>
                                     <form method="POST" action="../controllers/procesar_procesador.php" style="display:inline;" onsubmit="return confirm('¿Eliminar este procesador?');">
                                         <input type="hidden" name="accion" value="eliminar">
-                                        <input type="hidden" name="id_cpu" value="<?= $p['id_cpu'] ?>">
+                                        <input type="hidden" name="id_procesador" value="<?= $p['id_procesador'] ?>">
                                         <button type="submit" class="btn-icon">
                                             <img src="../../img/eliminar.png" alt="Eliminar">
                                         </button>
@@ -96,20 +103,30 @@ $procesadores = sqlsrv_query($conn, $sqlProcesadores);
                     <h2 id="modal-title">Crear nuevo Procesador</h2>
                     <form method="POST" action="../controllers/procesar_procesador.php" id="formProcesador">
                         <input type="hidden" name="accion" id="accion" value="crear">
-                        <input type="hidden" name="id_cpu" id="id_cpu">
+                        <input type="hidden" name="id_procesador" id="id_procesador">
 
                         <label>Modelo:</label>
                         <input type="text" name="modelo" id="modelo" required>
+                        
                         <label>Marca:</label>
                         <select name="id_marca" id="id_marca" required>
-                            <?php
-                            $sqlMarcas = "SELECT id_marca, nombre FROM marca";
-                            $marcas = sqlsrv_query($conn, $sqlMarcas);
-                            while ($marca = sqlsrv_fetch_array($marcas, SQLSRV_FETCH_ASSOC)) {
-                                echo "<option value='" . $marca['id_marca'] . "'>" . $marca['nombre'] . "</option>";
+                            <option value="">Seleccione una marca...</option>
+                            <?php 
+                            // Obtener marcas de procesador para el dropdown
+                            $marcasProcesadorArray = [];
+                            while ($marca = sqlsrv_fetch_array($marcasProcesador, SQLSRV_FETCH_ASSOC)) {
+                                $marcasProcesadorArray[] = $marca;
                             }
-                            ?>
+                            
+                            if (empty($marcasProcesadorArray)) { ?>
+                                <option value="">No hay marcas de tipo "Procesador" disponibles</option>
+                            <?php } else {
+                                foreach ($marcasProcesadorArray as $marca) { ?>
+                                    <option value="<?= $marca['id_marca'] ?>"><?= htmlspecialchars($marca['nombre']) ?></option>
+                                <?php }
+                            } ?>
                         </select>
+                        
                         <label>Generación:</label>
                         <input type="text" name="generacion" id="generacion">
                         <label>Núcleos:</label>
@@ -124,6 +141,34 @@ $procesadores = sqlsrv_query($conn, $sqlProcesadores);
                 </div>
             </div>
         </div>
+
+        <!-- Script para debug -->
+        <script>
+            // Cargar marcas de procesador para JavaScript
+            <?php 
+            // Reset query para JavaScript
+            $marcasProcesador2 = sqlsrv_query($conn, "SELECT m.*, tm.nombre as tipo_marca_nombre 
+                                                     FROM marca m 
+                                                     INNER JOIN tipo_marca tm ON m.id_tipo_marca = tm.id_tipo_marca 
+                                                     WHERE LOWER(tm.nombre) = 'procesador'");
+            $marcasArray = [];
+            while ($m = sqlsrv_fetch_array($marcasProcesador2, SQLSRV_FETCH_ASSOC)) {
+                $marcasArray[] = $m;
+            }
+            ?>
+            window.marcasProcesador = <?= json_encode($marcasArray) ?>;
+            
+            console.log('=== DEBUG PROCESADOR ===');
+            console.log('Marcas de procesador cargadas:', window.marcasProcesador);
+            
+            if (window.marcasProcesador.length === 0) {
+                console.warn('⚠️ No se encontraron marcas de tipo "Procesador"');
+                console.log('💡 Asegúrate de tener:');
+                console.log('1. Un tipo_marca con nombre "procesador" en la tabla tipo_marca');
+                console.log('2. Marcas asociadas a ese tipo_marca en la tabla marca');
+            }
+        </script>
+
          <script src="../../js/admin/crud_procesador.js"></script>
 
     </body>

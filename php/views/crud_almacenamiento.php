@@ -8,6 +8,13 @@ $sqlAlmacenamientos = "SELECT a.id_almacenamiento, a.tipo, a.interfaz, a.capacid
      FROM almacenamiento a
      INNER JOIN marca m ON a.id_marca = m.id_marca";
 $almacenamientos = sqlsrv_query($conn, $sqlAlmacenamientos);
+
+// Obtener marcas filtradas por tipo "Almacenamiento"
+$sqlMarcasAlmacenamiento = "SELECT m.*, tm.nombre as tipo_marca_nombre 
+                           FROM marca m 
+                           INNER JOIN tipo_marca tm ON m.id_tipo_marca = tm.id_tipo_marca 
+                           WHERE LOWER(tm.nombre) = 'almacenamiento'";
+$marcasAlmacenamiento = sqlsrv_query($conn, $sqlMarcasAlmacenamiento);
 ?>
 <!DOCTYPE html>
 <html>
@@ -112,13 +119,21 @@ $almacenamientos = sqlsrv_query($conn, $sqlAlmacenamientos);
 
                         <label>Marca:</label>
                         <select name="id_marca" id="id_marca" required>
-                            <?php
-                            $sqlMarcas = "SELECT id_marca, nombre FROM marca";
-                            $marcas = sqlsrv_query($conn, $sqlMarcas);
-                            while ($marca = sqlsrv_fetch_array($marcas, SQLSRV_FETCH_ASSOC)) {
-                                echo "<option value='" . $marca['id_marca'] . "'>" . $marca['nombre'] . "</option>";
+                            <option value="">Seleccione una marca...</option>
+                            <?php 
+                            // Obtener marcas de almacenamiento para el dropdown
+                            $marcasAlmacenamientoArray = [];
+                            while ($marca = sqlsrv_fetch_array($marcasAlmacenamiento, SQLSRV_FETCH_ASSOC)) {
+                                $marcasAlmacenamientoArray[] = $marca;
                             }
-                            ?>
+                            
+                            if (empty($marcasAlmacenamientoArray)) { ?>
+                                <option value="">No hay marcas de tipo "Almacenamiento" disponibles</option>
+                            <?php } else {
+                                foreach ($marcasAlmacenamientoArray as $marca) { ?>
+                                    <option value="<?= $marca['id_marca'] ?>"><?= htmlspecialchars($marca['nombre']) ?></option>
+                                <?php }
+                            } ?>
                         </select>
 
                         <button type="submit" id="btn-Guardar">Guardar</button>
@@ -126,6 +141,34 @@ $almacenamientos = sqlsrv_query($conn, $sqlAlmacenamientos);
                 </div>
             </div>
         </div>
+
+        <!-- Script para debug -->
+        <script>
+            // Cargar marcas de almacenamiento para JavaScript
+            <?php 
+            // Reset query para JavaScript
+            $marcasAlmacenamiento2 = sqlsrv_query($conn, "SELECT m.*, tm.nombre as tipo_marca_nombre 
+                                                         FROM marca m 
+                                                         INNER JOIN tipo_marca tm ON m.id_tipo_marca = tm.id_tipo_marca 
+                                                         WHERE LOWER(tm.nombre) = 'almacenamiento'");
+            $marcasArray = [];
+            while ($m = sqlsrv_fetch_array($marcasAlmacenamiento2, SQLSRV_FETCH_ASSOC)) {
+                $marcasArray[] = $m;
+            }
+            ?>
+            window.marcasAlmacenamiento = <?= json_encode($marcasArray) ?>;
+            
+            console.log('=== DEBUG ALMACENAMIENTO ===');
+            console.log('Marcas de almacenamiento cargadas:', window.marcasAlmacenamiento);
+            
+            if (window.marcasAlmacenamiento.length === 0) {
+                console.warn('⚠️ No se encontraron marcas de tipo "Almacenamiento"');
+                console.log('💡 Asegúrate de tener:');
+                console.log('1. Un tipo_marca con nombre "almacenamiento" en la tabla tipo_marca');
+                console.log('2. Marcas asociadas a ese tipo_marca en la tabla marca');
+            }
+        </script>
+
         <script src="../../js/admin/crud_almacenamiento.js"></script>
     </body>
 </html>

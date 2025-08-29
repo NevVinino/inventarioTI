@@ -10,17 +10,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $nucleos = $_POST["nucleos"] ?? '';
     $hilos = $_POST["hilos"] ?? '';
     $part_number = $_POST["part_number"] ?? '';
-    $id_cpu = $_POST["id_cpu"] ?? '';
+    $id_procesador = $_POST["id_procesador"] ?? '';
 
     if ($accion === "crear") {
         $sql = "INSERT INTO procesador (modelo, id_marca, generacion, nucleos, hilos, part_number) VALUES (?, ?, ?, ?, ?, ?)";
         $params = [$modelo, $id_marca, $generacion, $nucleos, $hilos, $part_number];
-    } elseif ($accion === "editar" && !empty($id_cpu)) {
-        $sql = "UPDATE procesador SET modelo = ?, id_marca = ?, generacion = ?, nucleos = ?, hilos = ?, part_number = ? WHERE id_cpu = ?";
-        $params = [$modelo, $id_marca, $generacion, $nucleos, $hilos, $part_number, $id_cpu];
-    } elseif ($accion === "eliminar" && !empty($id_cpu)) {
-        $sql = "DELETE FROM procesador WHERE id_cpu = ?";
-        $params = [$id_cpu];
+    } elseif ($accion === "editar" && !empty($id_procesador)) {
+        $sql = "UPDATE procesador SET modelo = ?, id_marca = ?, generacion = ?, nucleos = ?, hilos = ?, part_number = ? WHERE id_procesador = ?";
+        $params = [$modelo, $id_marca, $generacion, $nucleos, $hilos, $part_number, $id_procesador];
+    } elseif ($accion === "eliminar" && !empty($id_procesador)) {
+        $sql = "DELETE FROM procesador WHERE id_procesador = ?";
+        $params = [$id_procesador];
     } else {
         die("Acción no válida o faltan datos.");
     }

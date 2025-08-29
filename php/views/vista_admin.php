@@ -39,18 +39,24 @@ include("../includes/verificar_acceso.php");
                 <td><a href="crud_ram.php"><img src="../../img/tenor.gif"><p>Crear RAM</p></a></td>
                 <td><a href="crud_almacenamiento.php"><img src="../../img/tenor.gif"><p>Crear Almacenamiento</p></a></td>
                 <td><a href="crud_marca.php"><img src="../../img/tenor.gif"><p>Crear Marca</p></a></td>
-                <td><a href="crud_tipo_periferico.php"><img src="../../img/tenor.gif"><p>Crear Tipo de Periférico</p></a></td>
-                
-            </tr>
-            <tr>
-                <td><a href="crud_periferico.php"><img src="../../img/tenor.gif"><p>Crear Periférico</p></a></td>
-                <td><a href="crud_asignacion.php"><img src="../../img/tenor.gif"><p>Asignaciones Activos</p></a></td>
-                <td><a href="crud_asignacionPeriferico.php"><img src="../../img/tenor.gif"><p>Asignaciones Perifericos</p></a></td>
-                <td><a href="#"><img src="../../img/tenor.gif"><p>Apertura</p></a></td>
+                <td><a href="crud_tipo_marca.php"><img src="../../img/tenor.gif"><p>Crear Tipo de Marca</p></a></td>
             </tr>
 
             <tr>
-                <td><a href="crud_activo.php"><img src="../../img/tenor.gif"><p>Crear Activo</p></a></td>
+                <td><a href="crud_procesador_generico.php"><img src="../../img/tenor.gif"><p>Crear Procesador Generico</p></a></td>
+                <td><a href="crud_ram_generico.php"><img src="../../img/tenor.gif"><p>Crear RAM Generico</p></a></td>
+                <td><a href="crud_almacenamiento_generico.php"><img src="../../img/tenor.gif"><p>Crear Almacenamiento Generico</p></a></td>                
+            </tr>
+            
+            <tr>
+                <td><a href="crud_periferico.php"><img src="../../img/tenor.gif"><p>Crear Periférico</p></a></td>
+                <td><a href="crud_tipo_periferico.php"><img src="../../img/tenor.gif"><p>Crear Tipo de Periférico</p></a></td>
+                <td><a href="crud_asignacion.php"><img src="../../img/tenor.gif"><p>Asignaciones Activos</p></a></td>
+                <td><a href="crud_asignacionPeriferico.php"><img src="../../img/tenor.gif"><p>Asignaciones Perifericos</p></a></td>
+                
+            </tr>
+
+            <tr>
                 <td><a href="crud_laptop.php"><img src="../../img/tenor.gif"><p>Crear Laptop</p></a></td>
                 <td><a href="crud_pc.php"><img src="../../img/tenor.gif"><p>Crear PC</p></a></td>
                <td><a href="crud_servidor.php"><img src="../../img/tenor.gif"><p>Crear Servidor</p></a></td>
