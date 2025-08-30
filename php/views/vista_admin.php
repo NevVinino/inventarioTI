@@ -38,11 +38,14 @@ include("../includes/verificar_acceso.php");
                 <td><a href="crud_procesador.php"><img src="../../img/tenor.gif"><p>Crear Procesador</p></a></td>
                 <td><a href="crud_ram.php"><img src="../../img/tenor.gif"><p>Crear RAM</p></a></td>
                 <td><a href="crud_almacenamiento.php"><img src="../../img/tenor.gif"><p>Crear Almacenamiento</p></a></td>
-                <td><a href="crud_marca.php"><img src="../../img/tenor.gif"><p>Crear Marca</p></a></td>
-                <td><a href="crud_tipo_marca.php"><img src="../../img/tenor.gif"><p>Crear Tipo de Marca</p></a></td>
+                <td><a href="crud_tarjeta_video.php"><img src="../../img/tenor.gif"><p>Crear Tarjeta de Video</p></a></td>
+                <td><a href="crud_tarjeta_video_generico.php"><img src="../../img/tenor.gif"><p>Crear Tarjeta de Video Genérico</p></a></td>
+
             </tr>
 
             <tr>
+                <td><a href="crud_marca.php"><img src="../../img/tenor.gif"><p>Crear Marca</p></a></td>
+                <td><a href="crud_tipo_marca.php"><img src="../../img/tenor.gif"><p>Crear Tipo de Marca</p></a></td>
                 <td><a href="crud_procesador_generico.php"><img src="../../img/tenor.gif"><p>Crear Procesador Generico</p></a></td>
                 <td><a href="crud_ram_generico.php"><img src="../../img/tenor.gif"><p>Crear RAM Generico</p></a></td>
                 <td><a href="crud_almacenamiento_generico.php"><img src="../../img/tenor.gif"><p>Crear Almacenamiento Generico</p></a></td>                

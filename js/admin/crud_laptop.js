@@ -20,6 +20,22 @@ document.addEventListener("DOMContentLoaded", function () {
     const btnToggleObs = document.getElementById("toggleObservaciones");
     const contenedorObs = document.getElementById("contenedorObservaciones");
 
+    // --- configuración de slots ---
+    const slotsData = {
+        cpu: 1,
+        ram: 2,
+        almacenamiento: 1
+    };
+
+    // --- configuración de filtro de tipos de componentes ---
+    let tipoFiltroActual = 'todos'; // 'todos', 'generico', 'detallado'
+
+    // --- configuración de componentes (solo para RAM y Almacenamiento) ---
+    const componentesSeleccionados = {
+        RAM: new Set(),
+        Almacenamiento: new Set()
+    };
+
     // --- debug helper ---
     function debugTabla() {
         const tabla = document.getElementById("tablaLaptops");
@@ -44,13 +60,12 @@ document.addEventListener("DOMContentLoaded", function () {
         el.textContent = text;
     }
 
-    // --- toggle observaciones - MEJORADO ---
+    // --- toggle observaciones ---
     function configurarToggleObservaciones() {
         const btnToggle = document.getElementById("toggleObservaciones");
         const contenedor = document.getElementById("contenedorObservaciones");
         
         if (btnToggle && contenedor) {
-            // Remover listeners anteriores
             btnToggle.replaceWith(btnToggle.cloneNode(true));
             const nuevoBtn = document.getElementById("toggleObservaciones");
             
@@ -58,110 +73,1043 @@ document.addEventListener("DOMContentLoaded", function () {
                 e.preventDefault();
                 e.stopPropagation();
                 
-                console.log("Toggle observaciones clickeado");
-                
                 if (contenedor.style.display === "none" || contenedor.style.display === "") {
                     contenedor.style.display = "block";
                     nuevoBtn.textContent = "Ocultar";
-                    console.log("Observaciones mostradas");
                 } else {
                     contenedor.style.display = "none";
                     nuevoBtn.textContent = "Mostrar";
-                    console.log("Observaciones ocultadas");
                 }
-            });
-            
-            console.log("Toggle de observaciones configurado correctamente");
-        } else {
-            console.error("Elementos de observaciones no encontrados:", {
-                btnToggle: !!btnToggle,
-                contenedor: !!contenedor
             });
         }
     }
 
-    // --- configuración de componentes (solo para RAM y Almacenamiento) ---
-    const componentesSeleccionados = {
-        RAM: new Set(),
-        Almacenamiento: new Set()
-    };
-
-    // Función global para agregar componentes - ACTUALIZADA para excluir CPU
-    window.agregarComponente = function (tipo) {
-        // CPU ya no se maneja aquí, solo RAM y Almacenamiento
-        if (tipo === 'CPU') {
-            console.warn('CPU ya no se maneja como componente múltiple');
+    // --- configuración de filtro de tipos de componentes ---
+    function configurarFiltroTipoComponente() {
+        const btnToggle = document.getElementById('toggleTipoComponente');
+        const estadoFiltro = document.getElementById('estadoFiltro');
+        
+        if (!btnToggle || !estadoFiltro) {
+            console.error('Elementos de filtro no encontrados');
             return;
         }
-
-        const select = document.getElementById(`select${tipo}`);
-        const contenedor = document.getElementById(`${tipo.toLowerCase()}Seleccionados`);
-        const hiddenInput = document.getElementById(`${tipo.toLowerCase()}sHidden`);
-
-        console.log(`Intentando agregar componente ${tipo}:`, {
-            select: select?.value,
-            selectExists: !!select,
-            contenedor: !!contenedor,
-            hiddenInput: !!hiddenInput,
-            currentSize: componentesSeleccionados[tipo].size
+        
+        btnToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            console.log("=== CAMBIANDO FILTRO DE COMPONENTES ===");
+            console.log("Filtro anterior:", tipoFiltroActual);
+            
+            switch(tipoFiltroActual) {
+                case 'todos':
+                    tipoFiltroActual = 'generico';
+                    btnToggle.textContent = 'Solo Genéricos';
+                    btnToggle.className = 'btn-toggle-tipo filtro-generico';
+                    estadoFiltro.textContent = '(Solo componentes genéricos)';
+                    break;
+                case 'generico':
+                    tipoFiltroActual = 'detallado';
+                    btnToggle.textContent = 'Solo Detallados';
+                    btnToggle.className = 'btn-toggle-tipo filtro-detallado';
+                    estadoFiltro.textContent = '(Solo componentes detallados)';
+                    break;
+                case 'detallado':
+                    tipoFiltroActual = 'todos';
+                    btnToggle.textContent = 'Mostrar Todos';
+                    btnToggle.className = 'btn-toggle-tipo';
+                    estadoFiltro.textContent = '(Genéricos y Detallados)';
+                    break;
+            }
+            
+            console.log("Nuevo filtro:", tipoFiltroActual);
+            btnToggle.setAttribute('data-tipo', tipoFiltroActual);
+            
+            // Aplicar filtro a todos los selects de slots existentes
+            aplicarFiltroASlots();
+            
+            console.log(`=== FILTRO CAMBIADO A: ${tipoFiltroActual} ===`);
         });
+    }
 
-        if (!select || !select.value) {
-            alert('Por favor seleccione un componente primero');
-            return;
-        }
+    // --- event listeners para campos de slots - CORREGIDO ---
+    function configurarEventListenersSlots() {
+        ['slots_cpu', 'slots_ram', 'slots_almacenamiento'].forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                // Remover listener anterior si existe
+                element.removeEventListener('change', actualizarVistaSlots);
+                // Añadir nuevo listener
+                element.addEventListener('change', actualizarVistaSlots);
+                console.log(`Event listener configurado para ${id}`);
+            } else {
+                console.error(`Elemento ${id} no encontrado`);
+            }
+        });
+    }
 
-        if (componentesSeleccionados[tipo].has(select.value)) {
-            alert('Este componente ya está agregado');
-            return;
-        }
-
-        // Agregar al Set
-        componentesSeleccionados[tipo].add(select.value);
-
-        // Crear elemento visual
-        const div = document.createElement('div');
-        div.className = 'componente-tag';
-        div.dataset.id = select.value;
-        div.textContent = select.options[select.selectedIndex].text;
-
-        const btnEliminar = document.createElement('button');
-        btnEliminar.type = 'button';
-        btnEliminar.textContent = 'X';
-        btnEliminar.className = 'btn-eliminar-componente';
-        btnEliminar.onclick = () => {
-            const idToRemove = div.dataset.id;
-            componentesSeleccionados[tipo].delete(idToRemove);
-            div.remove();
-            actualizarHiddenInput(tipo);
-            console.log(`Componente ${tipo} eliminado. Total:`, componentesSeleccionados[tipo].size);
+    // --- función global para recopilar datos de slots ---
+    window.recopilarDatosSlots = function() {
+        const datos = {
+            cpu: null,
+            rams: [],
+            almacenamientos: []
         };
-
-        div.appendChild(btnEliminar);
-        contenedor.appendChild(div);
         
-        // Actualizar input oculto
-        actualizarHiddenInput(tipo);
-
-        // Limpiar select
-        select.value = '';
+        const cpuSlot = document.querySelector('select[data-tipo="cpu"][data-slot="0"]');
+        if (cpuSlot && cpuSlot.value) {
+            datos.cpu = cpuSlot.value;
+        }
         
-        console.log(`Componente ${tipo} agregado. Total:`, componentesSeleccionados[tipo].size);
-        console.log(`Hidden input value:`, hiddenInput?.value);
+        document.querySelectorAll('select[data-tipo="ram"]').forEach(slot => {
+            if (slot.value) {
+                datos.rams.push(slot.value);
+            }
+        });
+        
+        document.querySelectorAll('select[data-tipo="almacenamiento"]').forEach(slot => {
+            if (slot.value) {
+                datos.almacenamientos.push(slot.value);
+            }
+        });
+        
+        return datos;
     };
 
+    // --- función para actualizar hidden input ---
     function actualizarHiddenInput(tipo) {
-        // Solo para RAM y Almacenamiento
         if (tipo === 'CPU') return;
         
         const hiddenInput = document.getElementById(`${tipo.toLowerCase()}sHidden`);
         if (hiddenInput) {
             const valores = Array.from(componentesSeleccionados[tipo]);
             hiddenInput.value = valores.join(',');
-            console.log(`Hidden input ${tipo} actualizado:`, hiddenInput.value, 'Array:', valores);
-        } else {
-            console.error(`Hidden input para ${tipo} no encontrado`);
         }
+    }
+
+    // --- funciones para guardar y restaurar valores de slots - MEJORADAS PARA PRESERVACIÓN PERMANENTE ---
+    function guardarValoresSlots() {
+        const valores = {
+            cpu: {},
+            ram: {},
+            almacenamiento: {}
+        };
+        
+        // Guardar valores actuales en el sistema permanente
+        document.querySelectorAll('select[data-tipo="cpu"]').forEach(select => {
+            const slot = select.getAttribute('data-slot');
+            if (slot !== null && select.value && select.value !== '') {
+                const valorData = {
+                    valor: select.value,
+                    texto: select.options[select.selectedIndex]?.text || '',
+                    tipo: select.options[select.selectedIndex]?.getAttribute('data-tipo') || ''
+                };
+                valores.cpu[slot] = valorData;
+                seleccionesPermanentes.cpu[slot] = valorData; // Guardar permanentemente
+            }
+        });
+        
+        document.querySelectorAll('select[data-tipo="ram"]').forEach(select => {
+            const slot = select.getAttribute('data-slot');
+            if (slot !== null && select.value && select.value !== '') {
+                const valorData = {
+                    valor: select.value,
+                    texto: select.options[select.selectedIndex]?.text || '',
+                    tipo: select.options[select.selectedIndex]?.getAttribute('data-tipo') || ''
+                };
+                valores.ram[slot] = valorData;
+                seleccionesPermanentes.ram[slot] = valorData; // Guardar permanentemente
+            }
+        });
+        
+        document.querySelectorAll('select[data-tipo="almacenamiento"]').forEach(select => {
+            const slot = select.getAttribute('data-slot');
+            if (slot !== null && select.value && select.value !== '') {
+                const valorData = {
+                    valor: select.value,
+                    texto: select.options[select.selectedIndex]?.text || '',
+                    tipo: select.options[select.selectedIndex]?.getAttribute('data-tipo') || ''
+                };
+                valores.almacenamiento[slot] = valorData;
+                seleccionesPermanentes.almacenamiento[slot] = valorData; // Guardar permanentemente
+            }
+        });
+        
+        console.log("📥 Valores guardados (temporales):", valores);
+        console.log("💾 Selecciones permanentes actualizadas:", seleccionesPermanentes);
+        return valores;
+    }
+
+    function restaurarValoresSlots(valores) {
+        // Usar selecciones permanentes como fuente principal
+        const fuenteDatos = seleccionesPermanentes;
+        
+        console.log("🔄 Restaurando desde selecciones permanentes:", fuenteDatos);
+        
+        // Restaurar CPU
+        Object.keys(fuenteDatos.cpu || {}).forEach(slot => {
+            const select = document.querySelector(`select[data-tipo="cpu"][data-slot="${slot}"]`);
+            if (select && fuenteDatos.cpu[slot]) {
+                const valorBuscado = fuenteDatos.cpu[slot].valor;
+                const tipoComponente = fuenteDatos.cpu[slot].tipo;
+                
+                // Verificar si el componente debe estar visible en el filtro actual
+                const debeEstarVisible = tipoFiltroActual === 'todos' || tipoFiltroActual === tipoComponente;
+                
+                if (debeEstarVisible) {
+                    const optionExists = Array.from(select.options).some(option => option.value === valorBuscado);
+                    if (optionExists) {
+                        select.value = valorBuscado;
+                        console.log(`✅ CPU slot ${slot} restaurado:`, valorBuscado);
+                    } else {
+                        console.log(`⚠️ CPU ${valorBuscado} no encontrado en opciones actuales`);
+                    }
+                } else {
+                    // El componente está seleccionado pero no visible en el filtro actual
+                    // Agregar temporalmente la opción para mantener la selección
+                    const optionTemp = document.createElement('option');
+                    optionTemp.value = valorBuscado;
+                    optionTemp.textContent = fuenteDatos.cpu[slot].texto + ' (Oculto en filtro actual)';
+                    optionTemp.setAttribute('data-tipo', tipoComponente);
+                    optionTemp.style.fontStyle = 'italic';
+                    optionTemp.style.opacity = '0.7';
+                    select.appendChild(optionTemp);
+                    select.value = valorBuscado;
+                    console.log(`🔒 CPU slot ${slot} mantenido (oculto):`, valorBuscado);
+                }
+            }
+        });
+        
+        // Restaurar RAM
+        Object.keys(fuenteDatos.ram || {}).forEach(slot => {
+            const select = document.querySelector(`select[data-tipo="ram"][data-slot="${slot}"]`);
+            if (select && fuenteDatos.ram[slot]) {
+                const valorBuscado = fuenteDatos.ram[slot].valor;
+                const tipoComponente = fuenteDatos.ram[slot].tipo;
+                
+                const debeEstarVisible = tipoFiltroActual === 'todos' || tipoFiltroActual === tipoComponente;
+                
+                if (debeEstarVisible) {
+                    const optionExists = Array.from(select.options).some(option => option.value === valorBuscado);
+                    if (optionExists) {
+                        select.value = valorBuscado;
+                        console.log(`✅ RAM slot ${slot} restaurado:`, valorBuscado);
+                    }
+                } else {
+                    // Mantener selección oculta
+                    const optionTemp = document.createElement('option');
+                    optionTemp.value = valorBuscado;
+                    optionTemp.textContent = fuenteDatos.ram[slot].texto + ' (Oculto en filtro actual)';
+                    optionTemp.setAttribute('data-tipo', tipoComponente);
+                    optionTemp.style.fontStyle = 'italic';
+                    optionTemp.style.opacity = '0.7';
+                    select.appendChild(optionTemp);
+                    select.value = valorBuscado;
+                    console.log(`🔒 RAM slot ${slot} mantenido (oculto):`, valorBuscado);
+                }
+            }
+        });
+        
+        // Restaurar Almacenamiento
+        Object.keys(fuenteDatos.almacenamiento || {}).forEach(slot => {
+            const select = document.querySelector(`select[data-tipo="almacenamiento"][data-slot="${slot}"]`);
+            if (select && fuenteDatos.almacenamiento[slot]) {
+                const valorBuscado = fuenteDatos.almacenamiento[slot].valor;
+                const tipoComponente = fuenteDatos.almacenamiento[slot].tipo;
+                
+                const debeEstarVisible = tipoFiltroActual === 'todos' || tipoFiltroActual === tipoComponente;
+                
+                if (debeEstarVisible) {
+                    const optionExists = Array.from(select.options).some(option => option.value === valorBuscado);
+                    if (optionExists) {
+                        select.value = valorBuscado;
+                        console.log(`✅ Almacenamiento slot ${slot} restaurado:`, valorBuscado);
+                    }
+                } else {
+                    // Mantener selección oculta
+                    const optionTemp = document.createElement('option');
+                    optionTemp.value = valorBuscado;
+                    optionTemp.textContent = fuenteDatos.almacenamiento[slot].texto + ' (Oculto en filtro actual)';
+                    optionTemp.setAttribute('data-tipo', tipoComponente);
+                    optionTemp.style.fontStyle = 'italic';
+                    optionTemp.style.opacity = '0.7';
+                    select.appendChild(optionTemp);
+                    select.value = valorBuscado;
+                    console.log(`🔒 Almacenamiento slot ${slot} mantenido (oculto):`, valorBuscado);
+                }
+            }
+        });
+    }
+
+    // --- NUEVO: Sistema de preservación permanente de selecciones ---
+    let seleccionesPermanentes = {
+        cpu: {},
+        ram: {},
+        almacenamiento: {}
+    };
+
+    // --- NUEVA función para limpiar selecciones permanentes ---
+    function limpiarSeleccionesPermanentes() {
+        seleccionesPermanentes = {
+            cpu: {},
+            ram: {},
+            almacenamiento: {}
+        };
+        console.log("🧹 Selecciones permanentes limpiadas");
+    }
+
+    // --- NUEVA función para eliminar una selección específica ---
+    function eliminarSeleccionPermanente(tipo, slot) {
+        if (seleccionesPermanentes[tipo] && seleccionesPermanentes[tipo][slot]) {
+            delete seleccionesPermanentes[tipo][slot];
+            console.log(`🗑️ Eliminada selección permanente ${tipo} slot ${slot}`);
+        }
+    }
+
+    // --- funciones de slots - MEJORADAS para manejar cambios de selección ---
+    function generarSlotsHTML(tipo, cantidad) {
+        const container = document.getElementById(`slots-${tipo}-container`);
+        if (!container) {
+            console.error(`Container slots-${tipo}-container no encontrado`);
+            return;
+        }
+        
+        console.log(`🏗️ Generando ${cantidad} slots de ${tipo}`);
+        
+        container.innerHTML = `<h6>Slots de ${tipo.toUpperCase()} (${cantidad})</h6>`;
+        
+        for (let i = 0; i < cantidad; i++) {
+            const slotDiv = document.createElement('div');
+            slotDiv.className = 'slot-item';
+            slotDiv.innerHTML = `
+                <label>Slot ${i + 1}:</label>
+                <select name="slot_${tipo}_${i}" id="slot_${tipo}_${i}" class="slot-select" data-tipo="${tipo}" data-slot="${i}">
+                    <option value="">Libre</option>
+                </select>
+            `;
+            container.appendChild(slotDiv);
+        }
+        
+        // Llenar opciones según el tipo y filtro actual
+        const selects = container.querySelectorAll('.slot-select');
+        selects.forEach(select => {
+            llenarOpcionesSlotConFiltro(tipo, select);
+            
+            // NUEVO: Agregar listener para detectar cambios y actualizar selecciones permanentes
+            select.addEventListener('change', function() {
+                const slot = this.getAttribute('data-slot');
+                const tipoSlot = this.getAttribute('data-tipo');
+                
+                if (this.value && this.value !== '') {
+                    // Guardar nueva selección
+                    const valorData = {
+                        valor: this.value,
+                        texto: this.options[this.selectedIndex]?.text || '',
+                        tipo: this.options[this.selectedIndex]?.getAttribute('data-tipo') || ''
+                    };
+                    seleccionesPermanentes[tipoSlot][slot] = valorData;
+                    console.log(`💾 Nueva selección guardada: ${tipoSlot} slot ${slot} = ${this.value}`);
+                } else {
+                    // Eliminar selección
+                    eliminarSeleccionPermanente(tipoSlot, slot);
+                }
+            });
+        });
+        
+        console.log(`✅ ${cantidad} slots de ${tipo} generados correctamente`);
+    }
+
+    // --- abrir modal "Nuevo" - ACTUALIZADO para limpiar selecciones permanentes ---
+    if (btnNuevo) {
+        btnNuevo.addEventListener("click", function () {
+            if (!modal) return;
+
+            // Limpiar selecciones permanentes al abrir nuevo modal
+            limpiarSeleccionesPermanentes();
+
+            const modalTitle = document.getElementById("modal-title");
+            if (modalTitle) modalTitle.textContent = "Registrar Laptop";
+            const accionField = document.getElementById("accion");
+            if (accionField) accionField.value = "crear";
+
+            if (form) form.reset();
+            modal.querySelectorAll("input, select, textarea").forEach(el => el.disabled = false);
+
+            componentesSeleccionados.RAM.clear();
+            componentesSeleccionados.Almacenamiento.clear();
+
+            ['RAM', 'Almacenamiento'].forEach(tipo => {
+                const contenedor = document.getElementById(`${tipo.toLowerCase()}Seleccionados`);
+                if (contenedor) contenedor.innerHTML = '';
+                const hiddenInput = document.getElementById(`${tipo.toLowerCase()}sHidden`);
+                if (hiddenInput) hiddenInput.value = '';
+            });
+
+            safeSetText(labelAntiguedad, "(No calculado)");
+            safeSetText(labelGarantia, "(No calculado)");
+
+            const contenedorObs = document.getElementById("contenedorObservaciones");
+            const btnToggleObs = document.getElementById("toggleObservaciones");
+            if (btnToggleObs) btnToggleObs.textContent = "Mostrar";
+            if (contenedorObs) contenedorObs.style.display = "none";
+
+            calcularAntiguedad();
+            calcularEstadoGarantia();
+
+            // Configurar slots por defecto
+            document.getElementById('slots_cpu').value = 1;
+            document.getElementById('slots_ram').value = 2;
+            document.getElementById('slots_almacenamiento').value = 1;
+            
+            // Resetear filtro de componentes
+            tipoFiltroActual = 'todos';
+            const btnToggle = document.getElementById('toggleTipoComponente');
+            const estadoFiltro = document.getElementById('estadoFiltro');
+            if (btnToggle) {
+                btnToggle.textContent = 'Mostrar Todos';
+                btnToggle.className = 'btn-toggle-tipo';
+                btnToggle.setAttribute('data-tipo', 'todos');
+            }
+            if (estadoFiltro) {
+                estadoFiltro.textContent = '(Genéricos y Detallados)';
+            }
+            
+            // Configurar vista de slots
+            actualizarVistaSlots();
+            
+            // IMPORTANTE: Configurar event listeners DESPUÉS de actualizar slots
+            setTimeout(() => {
+                configurarEventListenersSlots();
+                configurarToggleObservaciones();
+            }, 150);
+
+            modal.style.display = "block";
+        });
+    }
+
+    // --- cerrar modal ---
+    if (spanClose && modal) {
+        spanClose.addEventListener("click", () => modal.style.display = "none");
+    }
+
+    // --- buscador ---
+    const buscador = document.getElementById("buscador");
+    const filas = document.querySelectorAll("#tablaLaptops tbody tr");
+    if (buscador) {
+        buscador.addEventListener("input", function () {
+            const valor = buscador.value.toLowerCase();
+            filas.forEach(function (fila) {
+                const texto = fila.textContent.toLowerCase();
+                fila.style.display = texto.includes(valor) ? "" : "none";
+            });
+        });
+    }
+
+    // --- Modal de visualización ---
+    const modalView = document.getElementById('modalVisualizacion');
+    const spanCloseView = document.querySelector('.close-view');
+
+    document.querySelectorAll(".btn-ver").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            if (!modalView) return;
+
+            document.querySelectorAll('#modalVisualizacion .detalle-item span').forEach(span => {
+                span.textContent = 'No especificado';
+                if (span.id === 'view-estado') {
+                    span.removeAttribute('data-estado');
+                }
+            });
+            
+            document.querySelectorAll('#modalVisualizacion .detalle-item div#view-qr').forEach(div => {
+                div.innerHTML = '';
+            });
+            
+            const downloadBtn = document.getElementById('download-qr');
+            if (downloadBtn) {
+                downloadBtn.style.display = 'none';
+            }
+            
+            for (let attr in this.dataset) {
+                const element = document.getElementById('view-' + attr);
+                if (element) {
+                    if (attr === 'qr') {
+                        const qrPath = this.dataset[attr];
+                        element.innerHTML = `<img src="../../${qrPath}" alt="QR Code">`;
+
+                        if (downloadBtn) {
+                            downloadBtn.style.display = 'block';
+                            downloadBtn.href = "../../" + qrPath;
+                            downloadBtn.download = qrPath.split('/').pop();
+                        }
+                    } 
+                    else if (attr === 'cpu' || attr === 'ram' || attr === 'almacenamiento') {
+                        const componentes = this.dataset[attr].split(', ');
+                        if (componentes.length > 0 && componentes[0] !== '') {
+                            if (componentes.length > 1) {
+                                const ul = document.createElement('ul');
+                                ul.className = 'componentes-lista';
+                                
+                                componentes.forEach(componente => {
+                                    const li = document.createElement('li');
+                                    li.textContent = componente;
+                                    ul.appendChild(li);
+                                });
+                                
+                                element.innerHTML = '';
+                                element.appendChild(ul);
+                            } else {
+                                element.textContent = componentes[0];
+                            }
+                        } else {
+                            element.textContent = 'No especificado';
+                        }
+                    }
+                    else if (attr === 'estado') {
+                        element.textContent = this.dataset[attr] || 'No especificado';
+                        element.setAttribute('data-estado', this.dataset[attr]);
+                    }
+                    else {
+                        element.textContent = this.dataset[attr] || 'No especificado';
+                    }
+                }
+            }
+
+            modalView.style.display = 'block';
+        });
+    });
+
+    if (spanCloseView) {
+        spanCloseView.addEventListener('click', function () {
+            if (modalView) modalView.style.display = 'none';
+        });
+    }
+
+    // --- funciones auxiliares ---
+    function cargarComponentes(tipo, datos) {
+        if (!datos || tipo === 'CPU') return;
+        
+        const contenedor = document.getElementById(`${tipo.toLowerCase()}Seleccionados`);
+        
+        datos.split('||').forEach(item => {
+            const [id, descripcion] = item.split('::');
+            if (!id || !descripcion) return;
+            
+            componentesSeleccionados[tipo].add(id);
+            
+            const div = document.createElement('div');
+            div.className = 'componente-tag';
+            div.dataset.id = id;
+            div.textContent = descripcion;
+            
+            const btnEliminar = document.createElement('button');
+            btnEliminar.type = 'button';
+            btnEliminar.textContent = 'X';
+            btnEliminar.onclick = () => {
+                componentesSeleccionados[tipo].delete(id);
+                div.remove();
+                actualizarHiddenInput(tipo);
+            };
+            
+            div.appendChild(btnEliminar);
+            contenedor.appendChild(div);
+        });
+        
+        actualizarHiddenInput(tipo);
+    }
+    
+    function verificarAsignacion(id_activo) {
+        fetch(`../controllers/procesar_laptop.php?verificar_asignacion=1&id_activo=${id_activo}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.asignado) {
+                    alert("Este activo está asignado actualmente. Algunas opciones de edición pueden estar limitadas.");
+                }
+            })
+            .catch(error => console.error('Error verificando asignación:', error));
+    }
+
+    function cargarSlotsExistentes(id_activo) {
+        fetch(`../controllers/procesar_laptop.php?obtener_slots=1&id_activo=${id_activo}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('slots_cpu').value = data.slots.cpu_count || 1;
+                    document.getElementById('slots_ram').value = data.slots.ram_count || 2;
+                    document.getElementById('slots_almacenamiento').value = data.slots.almacenamiento_count || 1;
+                    
+                    const cpuSlots = parseInt(document.getElementById('slots_cpu').value) || 1;
+                    const ramSlots = parseInt(document.getElementById('slots_ram').value) || 2;
+                    const almacenamientoSlots = parseInt(document.getElementById('slots_almacenamiento').value) || 1;
+                    
+                    slotsData.cpu = cpuSlots;
+                    slotsData.ram = ramSlots;
+                    slotsData.almacenamiento = almacenamientoSlots;
+                    
+                    const container = document.getElementById('slots-container');
+                    if (container) {
+                        container.style.display = 'block';
+                        
+                        generarSlotsHTML('cpu', cpuSlots);
+                        generarSlotsHTML('ram', ramSlots);
+                        generarSlotsHTML('almacenamiento', almacenamientoSlots);
+                    }
+                    
+                    cargarComponentesEnSlots(data.slots);
+                } else {
+                    document.getElementById('slots_cpu').value = 1;
+                    document.getElementById('slots_ram').value = 2;
+                    document.getElementById('slots_almacenamiento').value = 1;
+                    actualizarVistaSlots();
+                }
+            })
+            .catch(error => {
+                console.error('Error obteniendo slots:', error);
+                document.getElementById('slots_cpu').value = 1;
+                document.getElementById('slots_ram').value = 2;
+                document.getElementById('slots_almacenamiento').value = 1;
+                actualizarVistaSlots();
+            });
+    }
+
+    // --- cargar componentes en slots específicos - MEJORADA para cargar en selecciones permanentes ---
+    function cargarComponentesEnSlots(slotsData) {
+        // Limpiar selecciones permanentes antes de cargar desde BD
+        limpiarSeleccionesPermanentes();
+        
+        setTimeout(() => {
+            if (slotsData.cpu_slots && slotsData.cpu_slots.length > 0) {
+                slotsData.cpu_slots.forEach((slot, index) => {
+                    const cpuSelect = document.querySelector(`select[data-tipo="cpu"][data-slot="${index}"]`);
+                    if (cpuSelect && slot.componente) {
+                        const optionExists = Array.from(cpuSelect.options).some(option => option.value === slot.componente);
+                        if (optionExists) {
+                            cpuSelect.value = slot.componente;
+                            // Guardar en selecciones permanentes
+                            const valorData = {
+                                valor: slot.componente,
+                                texto: cpuSelect.options[cpuSelect.selectedIndex]?.text || '',
+                                tipo: cpuSelect.options[cpuSelect.selectedIndex]?.getAttribute('data-tipo') || ''
+                            };
+                            seleccionesPermanentes.cpu[index] = valorData;
+                        }
+                    }
+                });
+            }
+            
+            if (slotsData.ram_slots && slotsData.ram_slots.length > 0) {
+                slotsData.ram_slots.forEach((slot, index) => {
+                    const ramSelect = document.querySelector(`select[data-tipo="ram"][data-slot="${index}"]`);
+                    if (ramSelect && slot.componente) {
+                        const optionExists = Array.from(ramSelect.options).some(option => option.value === slot.componente);
+                        if (optionExists) {
+                            ramSelect.value = slot.componente;
+                            // Guardar en selecciones permanentes
+                            const valorData = {
+                                valor: slot.componente,
+                                texto: ramSelect.options[ramSelect.selectedIndex]?.text || '',
+                                tipo: ramSelect.options[ramSelect.selectedIndex]?.getAttribute('data-tipo') || ''
+                            };
+                            seleccionesPermanentes.ram[index] = valorData;
+                        }
+                    }
+                });
+            }
+            
+            if (slotsData.almacenamiento_slots && slotsData.almacenamiento_slots.length > 0) {
+                slotsData.almacenamiento_slots.forEach((slot, index) => {
+                    const almacenamientoSelect = document.querySelector(`select[data-tipo="almacenamiento"][data-slot="${index}"]`);
+                    if (almacenamientoSelect && slot.componente) {
+                        const optionExists = Array.from(almacenamientoSelect.options).some(option => option.value === slot.componente);
+                        if (optionExists) {
+                            almacenamientoSelect.value = slot.componente;
+                            // Guardar en selecciones permanentes
+                            const valorData = {
+                                valor: slot.componente,
+                                texto: almacenamientoSelect.options[almacenamientoSelect.selectedIndex]?.text || '',
+                                tipo: almacenamientoSelect.options[almacenamientoSelect.selectedIndex]?.getAttribute('data-tipo') || ''
+                            };
+                            seleccionesPermanentes.almacenamiento[index] = valorData;
+                        }
+                    }
+                });
+            }
+            
+            console.log("💾 Selecciones permanentes cargadas desde BD:", seleccionesPermanentes);
+        }, 100);
+    }
+
+    // --- editar activo - ACTUALIZADO para limpiar selecciones permanentes ---
+    document.querySelectorAll(".btn-editar").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            if (!modal) return;
+            modal.style.display = "block";
+            
+            // Limpiar selecciones permanentes al abrir modal de edición
+            limpiarSeleccionesPermanentes();
+            
+            document.getElementById("modal-title").textContent = "Editar Laptop";
+            document.getElementById("accion").value = "editar";
+            document.getElementById("id_activo").value = this.dataset.id;
+            
+            // Rellenar inputs básicos con los valores correctos
+            document.getElementById("nombreEquipo").value = this.dataset.nombreequipo || '';
+            document.getElementById("modelo").value = this.dataset.modelo || '';
+            document.getElementById("mac").value = this.dataset.mac || '';
+            document.getElementById("numberSerial").value = this.dataset.serial || '';
+            document.getElementById("fechaCompra").value = this.dataset.fechacompra || '';
+            document.getElementById("garantia").value = this.dataset.garantia || '';
+            document.getElementById("precioCompra").value = this.dataset.precio || '';
+            document.getElementById("antiguedad").value = this.dataset.antiguedad || '';
+            document.getElementById("ordenCompra").value = this.dataset.orden || '';
+            document.getElementById("estadoGarantia").value = this.dataset.estadogarantia || '';
+            document.getElementById("numeroIP").value = this.dataset.ip || '';
+            document.getElementById("observaciones").value = this.dataset.observaciones || '';
+            
+            // Establecer los selects
+            if (this.dataset.marca) {
+                const selectMarca = document.getElementById("id_marca");
+                if (selectMarca) selectMarca.value = this.dataset.marca;
+            }
+            
+            if (this.dataset.estadoactivo) {
+                const selectEstado = document.getElementById("id_estado_activo");
+                if (selectEstado) selectEstado.value = this.dataset.estadoactivo;
+            }
+            
+            if (this.dataset.empresa) {
+                const selectEmpresa = document.getElementById("id_empresa");
+                if (selectEmpresa) selectEmpresa.value = this.dataset.empresa;
+            }
+            
+            // Verificar si el activo está asignado antes de permitir edición
+            verificarAsignacion(this.dataset.id);
+            
+            // Configurar observaciones
+            const contenedorObs = document.getElementById("contenedorObservaciones");
+            const btnToggleObs = document.getElementById("toggleObservaciones");
+            
+            if (this.dataset.observaciones) {
+                if (contenedorObs) contenedorObs.style.display = "block";
+                if (btnToggleObs) btnToggleObs.textContent = "Ocultar";
+            } else {
+                if (contenedorObs) contenedorObs.style.display = "none";
+                if (btnToggleObs) btnToggleObs.textContent = "Mostrar";
+            }
+            
+            // Actualizar etiquetas
+            calcularAntiguedad();
+            calcularEstadoGarantia();
+            
+            // Limpiar y cargar componentes (solo RAM y Almacenamiento)
+            ['RAM', 'Almacenamiento'].forEach(tipo => {
+                const contenedor = document.getElementById(`${tipo.toLowerCase()}Seleccionados`);
+                if (contenedor) contenedor.innerHTML = '';
+                componentesSeleccionados[tipo].clear();
+            });
+            
+            // Cargar componentes desde los datos (excluir CPU)
+            cargarComponentes('RAM', this.dataset.rams);
+            cargarComponentes('Almacenamiento', this.dataset.almacenamientos);
+            
+            // Resetear filtro de componentes
+            tipoFiltroActual = 'todos';
+            const btnToggle = document.getElementById('toggleTipoComponente');
+            const estadoFiltro = document.getElementById('estadoFiltro');
+            if (btnToggle) {
+                btnToggle.textContent = 'Mostrar Todos';
+                btnToggle.className = 'btn-toggle-tipo';
+                btnToggle.setAttribute('data-tipo', 'todos');
+            }
+            if (estadoFiltro) {
+                estadoFiltro.textContent = '(Genéricos y Detallados)';
+            }
+            
+            // Cargar información de slots desde el servidor
+            cargarSlotsExistentes(this.dataset.id);
+            
+            // IMPORTANTE: Configurar event listeners DESPUÉS de cargar slots
+            setTimeout(() => {
+                configurarEventListenersSlots();
+                configurarToggleObservaciones();
+            }, 300);
+        });
+    });
+
+    // --- validación del formulario ---
+    if (form) {
+        form.addEventListener("submit", function(event) {
+            event.preventDefault();
+            
+            const datosSlots = recopilarDatosSlots();
+            
+            if (!datosSlots.cpu) {
+                alert("Debe asignar un procesador (CPU) a un slot");
+                return false;
+            }
+            
+            if (datosSlots.rams.length === 0) {
+                alert("Debe asignar al menos una memoria RAM a un slot");
+                return false;
+            }
+            
+            if (datosSlots.almacenamientos.length === 0) {
+                alert("Debe asignar al menos un dispositivo de almacenamiento a un slot");
+                return false;
+            }
+            
+            const slotsDataInput = document.getElementById('slotsDataHidden');
+            if (slotsDataInput) {
+                slotsDataInput.value = JSON.stringify(datosSlots);
+            } else {
+                alert("Error: No se pudo configurar los datos de slots");
+                return false;
+            }
+            
+            const nombreEquipo = document.getElementById("nombreEquipo");
+            const modelo = document.getElementById("modelo");
+            const serial = document.getElementById("numberSerial");
+            
+            if (!nombreEquipo.value.trim()) {
+                alert("El nombre del equipo es obligatorio");
+                nombreEquipo.focus();
+                return false;
+            }
+            
+            if (!modelo.value.trim()) {
+                alert("El modelo es obligatorio");
+                modelo.focus();
+                return false;
+            }
+            
+            if (!serial.value.trim()) {
+                alert("El número de serie es obligatorio");
+                serial.focus();
+                return false;
+            }
+            
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Guardando...';
+            
+            const formData = new FormData(form);
+            
+            fetch('../controllers/procesar_laptop.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(text => {
+                if (text.includes('❌ Error:')) {
+                    const errorMatch = text.match(/❌ Error: (.+?)(?:\.|$)/);
+                    const errorMessage = errorMatch ? errorMatch[1] : 'Error desconocido';
+                    alert('❌ Error: ' + errorMessage);
+                } else if (text.includes('Error:')) {
+                    const errorMatch = text.match(/Error: (.+?)(?:\.|$)/);
+                    const errorMessage = errorMatch ? errorMatch[1] : 'Error desconocido';
+                    alert('Error: ' + errorMessage);
+                } else {
+                    window.location.href = '../views/crud_laptop.php?success=1';
+                }
+            })
+            .catch(error => {
+                console.error('Error en la petición:', error);
+                alert('Error al comunicarse con el servidor: ' + error.message);
+            })
+            .finally(() => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            });
+            
+            return false;
+        });
+    }
+
+    // --- Botones de generación de QR ---
+    document.querySelectorAll('.btn-qr-generate, .btn-qr-regenerate').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            const isRegenerate = this.classList.contains('btn-qr-regenerate');
+            const idActivo = this.getAttribute('data-id') || this.dataset.id;
+            
+            if (!idActivo) {
+                alert('No se pudo identificar el ID del activo');
+                return;
+            }
+
+            if (isRegenerate) {
+                if (!confirm('¿Está seguro de que desea regenerar el código QR? Esto reemplazará el QR actual.')) {
+                    return;
+                }
+            }
+
+            this.disabled = true;
+            const originalText = this.textContent;
+            this.textContent = isRegenerate ? 'Regenerando...' : 'Generando...';
+
+            fetch('../controllers/procesar_laptop.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: `id_activo=${idActivo}&generar_qr=1`
+            })
+            .then(response => response.text())
+            .then(text => {
+                try {
+                    const data = JSON.parse(text);
+                    if (data.success) {
+                        alert(`QR ${isRegenerate ? 'regenerado' : 'generado'} correctamente`);
+                        window.location.reload();
+                    } else {
+                        alert(`Error al ${isRegenerate ? 'regenerar' : 'generar'} el QR: ` + (data.error || 'Error desconocido'));
+                    }
+                } catch (parseError) {
+                    alert('Error en la respuesta del servidor.');
+                }
+            })
+            .catch(error => {
+                alert('Error al comunicarse con el servidor: ' + error.message);
+            })
+            .finally(() => {
+                this.disabled = false;
+                this.textContent = originalText;
+            });
+        });
+    });
+
+    // --- inicialización - CORREGIDA ---
+    configurarToggleObservaciones();
+    configurarFiltroTipoComponente();
+    
+    // Configurar event listeners iniciales
+    configurarEventListenersSlots();
+    
+    window.addEventListener('load', function() {
+        debugTabla();
+        console.log("✅ Sistema de gestión de laptops cargado correctamente");
+    });
+    
+    // --- funciones de filtro - ULTRA MEJORADAS ---
+    function aplicarFiltroASlots() {
+        console.log("🔄 === APLICANDO FILTRO A SLOTS ===");
+        console.log("Filtro actual:", tipoFiltroActual);
+        
+        // GUARDAR valores actuales ANTES de aplicar cualquier cambio
+        const valoresActuales = guardarValoresSlots();
+        console.log("Valores guardados antes del filtro:", valoresActuales);
+        
+        // Aplicar filtro a todos los selects de slots existentes
+        document.querySelectorAll('.slot-select').forEach(select => {
+            const tipo = select.getAttribute('data-tipo');
+            if (tipo) {
+                llenarOpcionesSlotConFiltro(tipo, select);
+            }
+        });
+        
+        // RESTAURAR valores después de aplicar el filtro
+        // Usar setTimeout para asegurar que las opciones se han cargado completamente
+        setTimeout(() => {
+            restaurarValoresSlots(valoresActuales);
+            console.log("✅ === FILTRO APLICADO Y VALORES RESTAURADOS ===");
+        }, 50);
+    }
+
+    function llenarOpcionesSlotConFiltro(tipo, selectElement) {
+        let sourceSelect = null;
+        
+        switch(tipo) {
+            case 'cpu':
+                sourceSelect = document.getElementById('source-cpu');
+                break;
+            case 'ram':
+                sourceSelect = document.getElementById('source-ram');
+                break;
+            case 'almacenamiento':
+                sourceSelect = document.getElementById('source-almacenamiento');
+                break;
+        }
+        
+        if (!sourceSelect) {
+            console.error(`No se encontró el select fuente para ${tipo}`);
+            return;
+        }
+        
+        // Guardar el valor actual del select antes de limpiar
+        const valorActual = selectElement.value;
+        const textoActual = selectElement.options[selectElement.selectedIndex]?.text || '';
+        
+        const todasLasOpciones = Array.from(sourceSelect.options).slice(1);
+        let opcionesFiltradas = todasLasOpciones;
+        
+        if (tipoFiltroActual !== 'todos') {
+            opcionesFiltradas = todasLasOpciones.filter(option => {
+                const tipoOpcion = option.getAttribute('data-tipo');
+                return tipoOpcion === tipoFiltroActual;
+            });
+        }
+        
+        // Limpiar y llenar el select manteniendo el valor si es posible
+        selectElement.innerHTML = '<option value="">Libre</option>';
+        
+        opcionesFiltradas.forEach(option => {
+            const newOption = option.cloneNode(true);
+            selectElement.appendChild(newOption);
+        });
+        
+        // Intentar restaurar el valor inmediatamente si está disponible
+        if (valorActual && valorActual !== '') {
+            const optionExists = Array.from(selectElement.options).some(option => option.value === valorActual);
+            if (optionExists) {
+                selectElement.value = valorActual;
+                console.log(`🔄 Valor preservado inmediatamente en ${tipo}:`, valorActual);
+            } else {
+                console.log(`⚠️ Valor ${valorActual} no disponible en filtro ${tipoFiltroActual} para ${tipo}`);
+            }
+        }
+        
+        console.log(`📋 Opciones filtradas para ${tipo}:`, {
+            total: todasLasOpciones.length,
+            filtradas: opcionesFiltradas.length,
+            filtro: tipoFiltroActual,
+            valorActual: valorActual,
+            valorRestaurado: selectElement.value
+        });
+    }
+
+    function actualizarVistaSlots() {
+        console.log("🔄 === ACTUALIZANDO VISTA DE SLOTS ===");
+        
+        // GUARDAR valores actuales antes de regenerar
+        const valoresActuales = guardarValoresSlots();
+        
+        const cpuSlots = parseInt(document.getElementById('slots_cpu').value) || 1;
+        const ramSlots = parseInt(document.getElementById('slots_ram').value) || 2;
+        const almacenamientoSlots = parseInt(document.getElementById('slots_almacenamiento').value) || 1;
+        
+        console.log("📊 Nueva configuración de slots:", { cpuSlots, ramSlots, almacenamientoSlots });
+        
+        slotsData.cpu = cpuSlots;
+        slotsData.ram = ramSlots;
+        slotsData.almacenamiento = almacenamientoSlots;
+        
+        const container = document.getElementById('slots-container');
+        if (container) {
+            container.style.display = 'block';
+            
+            // Regenerar slots HTML
+            generarSlotsHTML('cpu', cpuSlots);
+            generarSlotsHTML('ram', ramSlots);
+            generarSlotsHTML('almacenamiento', almacenamientoSlots);
+        }
+        
+        // RESTAURAR valores después de regenerar
+        setTimeout(() => {
+            console.log("🔄 Restaurando valores después de actualizar vista...");
+            restaurarValoresSlots(valoresActuales);
+            console.log("✅ === VISTA DE SLOTS ACTUALIZADA Y VALORES RESTAURADOS ===");
+        }, 100);
     }
 
     // --- cálculo antigüedad ---
@@ -216,528 +1164,4 @@ document.addEventListener("DOMContentLoaded", function () {
     // --- listeners seguros ---
     if (fechaCompraInput) fechaCompraInput.addEventListener("change", calcularAntiguedad);
     if (garantiaInput) garantiaInput.addEventListener("change", calcularEstadoGarantia);
-
-    // --- abrir modal "Nuevo" - ACTUALIZADO ---
-    if (btnNuevo) {
-        btnNuevo.addEventListener("click", function () {
-            if (!modal) return;
-
-            console.log("Abriendo modal nuevo...");
-
-            const modalTitle = document.getElementById("modal-title");
-            if (modalTitle) modalTitle.textContent = "Registrar Laptop";
-            const accionField = document.getElementById("accion");
-            if (accionField) accionField.value = "crear";
-
-            if (form) form.reset();
-            modal.querySelectorAll("input, select, textarea").forEach(el => el.disabled = false);
-
-            // Limpiar componentes seleccionados (solo RAM y Almacenamiento)
-            componentesSeleccionados.RAM.clear();
-            componentesSeleccionados.Almacenamiento.clear();
-
-            // Limpiar CPU select
-            const cpuSelect = document.getElementById('id_cpu');
-            if (cpuSelect) cpuSelect.value = '';
-
-            ['RAM', 'Almacenamiento'].forEach(tipo => {
-                const contenedor = document.getElementById(`${tipo.toLowerCase()}Seleccionados`);
-                if (contenedor) contenedor.innerHTML = '';
-                const hiddenInput = document.getElementById(`${tipo.toLowerCase()}sHidden`);
-                if (hiddenInput) hiddenInput.value = '';
-            });
-
-            safeSetText(labelAntiguedad, "(No calculado)");
-            safeSetText(labelGarantia, "(No calculado)");
-
-            // Configurar observaciones
-            const contenedorObs = document.getElementById("contenedorObservaciones");
-            const btnToggleObs = document.getElementById("toggleObservaciones");
-            if (btnToggleObs) btnToggleObs.textContent = "Mostrar";
-            if (contenedorObs) contenedorObs.style.display = "none";
-
-            calcularAntiguedad();
-            calcularEstadoGarantia();
-
-            modal.style.display = "block";
-            
-            // Configurar toggle de observaciones DESPUÉS de abrir el modal
-            setTimeout(() => {
-                configurarToggleObservaciones();
-            }, 100);
-
-            console.log("Modal abierto, componentes limpiados");
-        });
-    }
-
-    // --- cerrar modal ---
-    if (spanClose && modal) {
-        spanClose.addEventListener("click", () => modal.style.display = "none");
-    }
-
-    // --- buscador ---
-    const buscador = document.getElementById("buscador");
-    const filas = document.querySelectorAll("#tablaLaptops tbody tr");
-    if (buscador) {
-        buscador.addEventListener("input", function () {
-            const valor = buscador.value.toLowerCase();
-            filas.forEach(function (fila) {
-                const texto = fila.textContent.toLowerCase();
-                fila.style.display = texto.includes(valor) ? "" : "none";
-            });
-        });
-    }
-
-    // --- Modal de visualización ---
-    const modalView = document.getElementById('modalVisualizacion');
-    const spanCloseView = document.querySelector('.close-view');
-
-    document.querySelectorAll(".btn-ver").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-            if (!modalView) return;
-
-            console.log("Dataset del botón ver:", this.dataset);
-            
-            // Limpiar campos para evitar datos de visualizaciones anteriores
-            document.querySelectorAll('#modalVisualizacion .detalle-item span').forEach(span => {
-                span.textContent = 'No especificado';
-                if (span.id === 'view-estado') {
-                    span.removeAttribute('data-estado');
-                }
-            });
-            
-            document.querySelectorAll('#modalVisualizacion .detalle-item div#view-qr').forEach(div => {
-                div.innerHTML = '';
-            });
-            
-            // Ocultar botón de descarga de QR si no hay QR
-            const downloadBtn = document.getElementById('download-qr');
-            if (downloadBtn) {
-                downloadBtn.style.display = 'none';
-            }
-            
-            // Establecer valores desde el dataset
-            for (let attr in this.dataset) {
-                const element = document.getElementById('view-' + attr);
-                if (element) {
-                    if (attr === 'qr') {
-                        const qrPath = this.dataset[attr];
-                        element.innerHTML = `<img src="../../${qrPath}" alt="QR Code">`;
-
-                        if (downloadBtn) {
-                            downloadBtn.style.display = 'block';
-                            downloadBtn.href = "../../" + qrPath;
-                            downloadBtn.download = qrPath.split('/').pop();
-                        }
-                    } 
-                    // Formato especial para componentes (CPU, RAM, almacenamiento)
-                    else if (attr === 'cpu' || attr === 'ram' || attr === 'almacenamiento') {
-                        // Dividir por comas para presentar en formato de lista
-                        const componentes = this.dataset[attr].split(', ');
-                        if (componentes.length > 0 && componentes[0] !== '') {
-                            // Crear una lista HTML si hay más de un componente
-                            if (componentes.length > 1) {
-                                const ul = document.createElement('ul');
-                                ul.className = 'componentes-lista';
-                                
-                                componentes.forEach(componente => {
-                                    const li = document.createElement('li');
-                                    li.textContent = componente;
-                                    ul.appendChild(li);
-                                });
-                                
-                                element.innerHTML = '';
-                                element.appendChild(ul);
-                            } else {
-                                element.textContent = componentes[0];
-                            }
-                        } else {
-                            element.textContent = 'No especificado';
-                        }
-                    }
-                    // Para el campo estado, añadir también el atributo data-estado
-                    else if (attr === 'estado') {
-                        element.textContent = this.dataset[attr] || 'No especificado';
-                        element.setAttribute('data-estado', this.dataset[attr]);
-                    }
-                    else {
-                        element.textContent = this.dataset[attr] || 'No especificado';
-                    }
-                }
-            }
-
-            modalView.style.display = 'block';
-        });
-    });
-
-    if (spanCloseView) {
-        spanCloseView.addEventListener('click', function () {
-            if (modalView) modalView.style.display = 'none';
-        });
-    }
-
-    // --- editar activo - ACTUALIZADO ---
-    document.querySelectorAll(".btn-editar").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-            if (!modal) return;
-            modal.style.display = "block";
-            
-            console.log("Dataset del botón editar:", this.dataset);
-            
-            // Establecer título y acción
-            document.getElementById("modal-title").textContent = "Editar Laptop";
-            document.getElementById("accion").value = "editar";
-            document.getElementById("id_activo").value = this.dataset.id;
-            
-            // Rellenar inputs básicos con los valores correctos
-            document.getElementById("nombreEquipo").value = this.dataset.nombreequipo || '';
-            document.getElementById("modelo").value = this.dataset.modelo || '';
-            document.getElementById("mac").value = this.dataset.mac || '';
-            document.getElementById("numberSerial").value = this.dataset.serial || '';
-            document.getElementById("fechaCompra").value = this.dataset.fechacompra || '';
-            document.getElementById("garantia").value = this.dataset.garantia || '';
-            document.getElementById("precioCompra").value = this.dataset.precio || '';
-            document.getElementById("antiguedad").value = this.dataset.antiguedad || '';
-            document.getElementById("ordenCompra").value = this.dataset.orden || '';
-            document.getElementById("estadoGarantia").value = this.dataset.estadogarantia || '';
-            document.getElementById("numeroIP").value = this.dataset.ip || '';
-            document.getElementById("observaciones").value = this.dataset.observaciones || '';
-            
-            // Establecer los selects
-            if (this.dataset.marca) {
-                const selectMarca = document.getElementById("id_marca");
-                if (selectMarca) selectMarca.value = this.dataset.marca;
-            }
-            
-            if (this.dataset.estadoactivo) {
-                const selectEstado = document.getElementById("id_estado_activo");
-                if (selectEstado) selectEstado.value = this.dataset.estadoactivo;
-            }
-            
-            if (this.dataset.empresa) {
-                const selectEmpresa = document.getElementById("id_empresa");
-                if (selectEmpresa) selectEmpresa.value = this.dataset.empresa;
-            }
-            
-            // Establecer CPU desde los datos (single select)
-            if (this.dataset.cpus) {
-                const cpuData = this.dataset.cpus.split('||')[0]; // Solo tomar el primer CPU
-                if (cpuData) {
-                    const [cpuId] = cpuData.split('::');
-                    const cpuSelect = document.getElementById('id_cpu');
-                    if (cpuSelect && cpuId) {
-                        cpuSelect.value = cpuId;
-                    }
-                }
-            }
-            
-            // Verificar si el activo está asignado antes de permitir edición
-            verificarAsignacion(this.dataset.id);
-            
-            // Configurar observaciones
-            const contenedorObs = document.getElementById("contenedorObservaciones");
-            const btnToggleObs = document.getElementById("toggleObservaciones");
-            
-            if (this.dataset.observaciones) {
-                if (contenedorObs) contenedorObs.style.display = "block";
-                if (btnToggleObs) btnToggleObs.textContent = "Ocultar";
-            } else {
-                if (contenedorObs) contenedorObs.style.display = "none";
-                if (btnToggleObs) btnToggleObs.textContent = "Mostrar";
-            }
-            
-            // Actualizar etiquetas
-            calcularAntiguedad();
-            calcularEstadoGarantia();
-            
-            // Limpiar y cargar componentes (solo RAM y Almacenamiento)
-            ['RAM', 'Almacenamiento'].forEach(tipo => {
-                const contenedor = document.getElementById(`${tipo.toLowerCase()}Seleccionados`);
-                if (contenedor) contenedor.innerHTML = '';
-                componentesSeleccionados[tipo].clear();
-            });
-            
-            // Cargar componentes desde los datos (excluir CPU)
-            cargarComponentes('RAM', this.dataset.rams);
-            cargarComponentes('Almacenamiento', this.dataset.almacenamientos);
-            
-            // Configurar toggle de observaciones DESPUÉS de configurar todo
-            setTimeout(() => {
-                configurarToggleObservaciones();
-            }, 100);
-        });
-    });
-
-    // Función para cargar componentes desde los datos - ACTUALIZADA
-    function cargarComponentes(tipo, datos) {
-        if (!datos || tipo === 'CPU') return; // CPU ya no se maneja aquí
-        
-        const contenedor = document.getElementById(`${tipo.toLowerCase()}Seleccionados`);
-        const hiddenInput = document.getElementById(`${tipo.toLowerCase()}sHidden`);
-        
-        datos.split('||').forEach(item => {
-            const [id, descripcion] = item.split('::');
-            if (!id || !descripcion) return;
-            
-            componentesSeleccionados[tipo].add(id);
-            
-            const div = document.createElement('div');
-            div.className = 'componente-tag';
-            div.dataset.id = id;
-            div.textContent = descripcion;
-            
-            const btnEliminar = document.createElement('button');
-            btnEliminar.type = 'button';
-            btnEliminar.textContent = 'X';
-            btnEliminar.onclick = () => {
-                componentesSeleccionados[tipo].delete(id);
-                div.remove();
-                actualizarHiddenInput(tipo);
-            };
-            
-            div.appendChild(btnEliminar);
-            contenedor.appendChild(div);
-        });
-        
-        actualizarHiddenInput(tipo);
-    }
-    
-    // Función para verificar si un activo está asignado
-    function verificarAsignacion(id_activo) {
-        fetch(`../controllers/procesar_laptop.php?verificar_asignacion=1&id_activo=${id_activo}`)
-            .then(response => response.json())
-            .then(data => {
-                const form = document.getElementById("formActivo");
-                if (data.asignado) {
-                    // Mostrar advertencia
-                    alert("Este activo está asignado actualmente. Algunas opciones de edición pueden estar limitadas.");
-                }
-            })
-            .catch(error => console.error('Error verificando asignación:', error));
-    }
-
-    // --- validación del formulario - ACTUALIZADA ---
-    if (form) {
-        form.addEventListener("submit", function(event) {
-            event.preventDefault(); // Prevenir envío normal del formulario
-            
-            console.log("=== INICIANDO VALIDACIÓN ===");
-            
-            // Verificar CPU (single select)
-            const cpuSelect = document.getElementById('id_cpu');
-            if (!cpuSelect || !cpuSelect.value) {
-                alert("Debe seleccionar un procesador (CPU)");
-                if (cpuSelect) cpuSelect.focus();
-                return false;
-            }
-            
-            // Verificar estado actual de componentes (solo RAM y Almacenamiento)
-            console.log("Estado de componentesSeleccionados:", {
-                RAM: {
-                    size: componentesSeleccionados.RAM.size,
-                    values: Array.from(componentesSeleccionados.RAM)
-                },
-                Almacenamiento: {
-                    size: componentesSeleccionados.Almacenamiento.size,
-                    values: Array.from(componentesSeleccionados.Almacenamiento)
-                }
-            });
-
-            // Verificar inputs ocultos
-            const ramHidden = document.getElementById("ramsHidden");
-            const almacenamientoHidden = document.getElementById("almacenamientosHidden");
-            
-            console.log("Estado de inputs ocultos:", {
-                ramsHidden: ramHidden?.value,
-                almacenamientosHidden: almacenamientoHidden?.value
-            });
-
-            // Validar usando AMBOS métodos (solo para RAM y Almacenamiento)
-            let ramValido = componentesSeleccionados.RAM.size > 0 || (ramHidden?.value && ramHidden.value.trim() !== '');
-            let almacenamientoValido = componentesSeleccionados.Almacenamiento.size > 0 || (almacenamientoHidden?.value && almacenamientoHidden.value.trim() !== '');
-
-            console.log("Validación de componentes:", {
-                cpuValido: !!cpuSelect.value,
-                ramValido,
-                almacenamientoValido
-            });
-            
-            if (!ramValido) {
-                alert("Debe agregar al menos una memoria RAM");
-                console.log("Validación fallida: RAM");
-                return false;
-            }
-            
-            if (!almacenamientoValido) {
-                alert("Debe agregar al menos un dispositivo de almacenamiento");
-                console.log("Validación fallida: Almacenamiento");
-                return false;
-            }
-            
-            // Validar campos obligatorios adicionales
-            const nombreEquipo = document.getElementById("nombreEquipo");
-            const modelo = document.getElementById("modelo");
-            const serial = document.getElementById("numberSerial");
-            
-            if (!nombreEquipo.value.trim()) {
-                alert("El nombre del equipo es obligatorio");
-                nombreEquipo.focus();
-                return false;
-            }
-            
-            if (!modelo.value.trim()) {
-                alert("El modelo es obligatorio");
-                modelo.focus();
-                return false;
-            }
-            
-            if (!serial.value.trim()) {
-                alert("El número de serie es obligatorio");
-                serial.focus();
-                return false;
-            }
-            
-            console.log("=== VALIDACIÓN EXITOSA - ENVIANDO VIA AJAX ===");
-            
-            // Deshabilitar el botón de envío para evitar múltiples envíos
-            const submitBtn = form.querySelector('button[type="submit"]');
-            const originalText = submitBtn.textContent;
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Guardando...';
-            
-            // Recopilar datos del formulario
-            const formData = new FormData(form);
-            
-            // Enviar vía AJAX
-            fetch('../controllers/procesar_laptop.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.text())
-            .then(text => {
-                console.log('Respuesta del servidor:', text);
-                
-                // Verificar si la respuesta contiene un error
-                if (text.includes('❌ Error:')) {
-                    // Extraer el mensaje de error
-                    const errorMatch = text.match(/❌ Error: (.+?)(?:\.|$)/);
-                    const errorMessage = errorMatch ? errorMatch[1] : 'Error desconocido';
-                    alert('❌ Error: ' + errorMessage);
-                } else if (text.includes('Error:')) {
-                    // Manejar otros tipos de errores
-                    const errorMatch = text.match(/Error: (.+?)(?:\.|$)/);
-                    const errorMessage = errorMatch ? errorMatch[1] : 'Error desconocido';
-                    alert('Error: ' + errorMessage);
-                } else {
-                    // Si no hay errores, redirigir directamente sin mostrar alerta
-                    window.location.href = '../views/crud_laptop.php?success=1';
-                }
-            })
-            .catch(error => {
-                console.error('Error en la petición:', error);
-                alert('Error al comunicarse con el servidor: ' + error.message);
-            })
-            .finally(() => {
-                // Rehabilitar el botón
-                submitBtn.disabled = false;
-                submitBtn.textContent = originalText;
-            });
-            
-            return false;
-        });
-    }
-
-    // --- Botones de generación de QR ---
-    document.querySelectorAll('.btn-qr-generate, .btn-qr-regenerate').forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            
-            const isRegenerate = this.classList.contains('btn-qr-regenerate');
-            
-            // Debug: mostrar todos los atributos del botón
-            console.log(`Botón ${isRegenerate ? 'Regenerar' : 'Generar'} QR clickeado:`);
-            console.log("Element:", this);
-            console.log("Dataset:", this.dataset);
-            
-            const idActivo = this.getAttribute('data-id') || this.dataset.id;
-            
-            console.log("ID del activo obtenido:", idActivo);
-            
-            if (!idActivo) {
-                console.error("No se encontró data-id en el botón");
-                alert('No se pudo identificar el ID del activo');
-                return;
-            }
-
-            // Mensaje de confirmación para regenerar
-            if (isRegenerate) {
-                if (!confirm('¿Está seguro de que desea regenerar el código QR? Esto reemplazará el QR actual.')) {
-                    return;
-                }
-            }
-
-            this.disabled = true;
-            const originalText = this.textContent;
-            this.textContent = isRegenerate ? 'Regenerando...' : 'Generando...';
-
-            console.log(`Iniciando ${isRegenerate ? 'regeneración' : 'generación'} de QR para activo ID: ${idActivo}`);
-
-            // Llamada AJAX para generar QR
-            fetch('../controllers/procesar_laptop.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                body: `id_activo=${idActivo}&generar_qr=1`
-            })
-            .then(response => {
-                console.log('Respuesta recibida:', response.status);
-                return response.text();
-            })
-            .then(text => {
-                console.log('Texto de respuesta:', text);
-                try {
-                    const data = JSON.parse(text);
-                    if (data.success) {
-                        console.log(`QR ${isRegenerate ? 'regenerado' : 'generado'} exitosamente:`, data.data);
-                        alert(`QR ${isRegenerate ? 'regenerado' : 'generado'} correctamente`);
-                        
-                        // Encontrar el botón "Ver" asociado a este activo y actualizar su data-qr
-                        const btnVer = document.querySelector(`.btn-ver[data-id="${idActivo}"]`);
-                        if (btnVer) {
-                            btnVer.setAttribute('data-qr', data.data.ruta_qr);
-                        }
-                        
-                        // Recargar la página para mostrar el QR actualizado
-                        window.location.reload();
-                    } else {
-                        console.error('Error en la respuesta:', data.error);
-                        alert(`Error al ${isRegenerate ? 'regenerar' : 'generar'} el QR: ` + (data.error || 'Error desconocido'));
-                    }
-                } catch (parseError) {
-                    console.error('Error parseando JSON:', parseError);
-                    console.error('Respuesta original:', text);
-                    alert('Error en la respuesta del servidor. Revisa la consola para más detalles.');
-                }
-            })
-            .catch(error => {
-                console.error('Error en la petición:', error);
-                alert('Error al comunicarse con el servidor: ' + error.message);
-            })
-            .finally(() => {
-                this.disabled = false;
-                this.textContent = originalText;
-            });
-        });
-    });
-
-    // --- inicialización ---
-    // Configurar toggle inicial
-    configurarToggleObservaciones();
-    
-    // Ejecutar depuración de tabla al cargar
-    window.addEventListener('load', function() {
-        debugTabla();
-        console.log("Sistema de gestión de laptops cargado correctamente");
-    });
 });
