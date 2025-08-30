@@ -20,11 +20,12 @@ document.addEventListener("DOMContentLoaded", function () {
     const btnToggleObs = document.getElementById("toggleObservaciones");
     const contenedorObs = document.getElementById("contenedorObservaciones");
 
-    // --- configuración de slots ---
+    // --- configuración de slots --- ACTUALIZADO para incluir tarjeta de video
     const slotsData = {
         cpu: 1,
         ram: 2,
-        almacenamiento: 1
+        almacenamiento: 1,
+        tarjeta_video: 0  // NUEVO: inicialmente 0 slots para tarjeta de video
     };
 
     // --- configuración de filtro de tipos de componentes ---
@@ -132,9 +133,9 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // --- event listeners para campos de slots - CORREGIDO ---
+    // --- event listeners para campos de slots - ACTUALIZADO para tarjeta de video ---
     function configurarEventListenersSlots() {
-        ['slots_cpu', 'slots_ram', 'slots_almacenamiento'].forEach(id => {
+        ['slots_cpu', 'slots_ram', 'slots_almacenamiento', 'slots_tarjeta_video'].forEach(id => {
             const element = document.getElementById(id);
             if (element) {
                 // Remover listener anterior si existe
@@ -148,12 +149,13 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // --- función global para recopilar datos de slots ---
+    // --- función global para recopilar datos de slots --- ACTUALIZADA para tarjetas de video
     window.recopilarDatosSlots = function() {
         const datos = {
             cpu: null,
             rams: [],
-            almacenamientos: []
+            almacenamientos: [],
+            tarjetas_video: [] // NUEVO
         };
         
         const cpuSlot = document.querySelector('select[data-tipo="cpu"][data-slot="0"]');
@@ -173,6 +175,13 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
         
+        // NUEVO: Recopilar datos de tarjetas de video
+        document.querySelectorAll('select[data-tipo="tarjeta_video"]').forEach(slot => {
+            if (slot.value) {
+                datos.tarjetas_video.push(slot.value);
+            }
+        });
+        
         return datos;
     };
 
@@ -187,12 +196,13 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    // --- funciones para guardar y restaurar valores de slots - MEJORADAS PARA PRESERVACIÓN PERMANENTE ---
+    // --- funciones para guardar y restaurar valores de slots - ACTUALIZADAS para tarjeta de video ---
     function guardarValoresSlots() {
         const valores = {
             cpu: {},
             ram: {},
-            almacenamiento: {}
+            almacenamiento: {},
+            tarjeta_video: {} // NUEVO
         };
         
         // Guardar valores actuales en el sistema permanente
@@ -232,6 +242,20 @@ document.addEventListener("DOMContentLoaded", function () {
                 };
                 valores.almacenamiento[slot] = valorData;
                 seleccionesPermanentes.almacenamiento[slot] = valorData; // Guardar permanentemente
+            }
+        });
+        
+        // NUEVO: Guardar valores de tarjetas de video
+        document.querySelectorAll('select[data-tipo="tarjeta_video"]').forEach(select => {
+            const slot = select.getAttribute('data-slot');
+            if (slot !== null && select.value && select.value !== '') {
+                const valorData = {
+                    valor: select.value,
+                    texto: select.options[select.selectedIndex]?.text || '',
+                    tipo: select.options[select.selectedIndex]?.getAttribute('data-tipo') || ''
+                };
+                valores.tarjeta_video[slot] = valorData;
+                seleccionesPermanentes.tarjeta_video[slot] = valorData; // Guardar permanentemente
             }
         });
         
@@ -339,21 +363,53 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
             }
         });
+        
+        // NUEVO: Restaurar Tarjetas de Video
+        Object.keys(fuenteDatos.tarjeta_video || {}).forEach(slot => {
+            const select = document.querySelector(`select[data-tipo="tarjeta_video"][data-slot="${slot}"]`);
+            if (select && fuenteDatos.tarjeta_video[slot]) {
+                const valorBuscado = fuenteDatos.tarjeta_video[slot].valor;
+                const tipoComponente = fuenteDatos.tarjeta_video[slot].tipo;
+                
+                const debeEstarVisible = tipoFiltroActual === 'todos' || tipoFiltroActual === tipoComponente;
+                
+                if (debeEstarVisible) {
+                    const optionExists = Array.from(select.options).some(option => option.value === valorBuscado);
+                    if (optionExists) {
+                        select.value = valorBuscado;
+                        console.log(`✅ Tarjeta de Video slot ${slot} restaurado:`, valorBuscado);
+                    }
+                } else {
+                    // Mantener selección oculta
+                    const optionTemp = document.createElement('option');
+                    optionTemp.value = valorBuscado;
+                    optionTemp.textContent = fuenteDatos.tarjeta_video[slot].texto + ' (Oculto en filtro actual)';
+                    optionTemp.setAttribute('data-tipo', tipoComponente);
+                    optionTemp.style.fontStyle = 'italic';
+                    optionTemp.style.opacity = '0.7';
+                    select.appendChild(optionTemp);
+                    select.value = valorBuscado;
+                    console.log(`🔒 Tarjeta de Video slot ${slot} mantenido (oculto):`, valorBuscado);
+                }
+            }
+        });
     }
 
-    // --- NUEVO: Sistema de preservación permanente de selecciones ---
+    // --- NUEVO: Sistema de preservación permanente de selecciones - ACTUALIZADO ---
     let seleccionesPermanentes = {
         cpu: {},
         ram: {},
-        almacenamiento: {}
+        almacenamiento: {},
+        tarjeta_video: {} // NUEVO
     };
 
-    // --- NUEVA función para limpiar selecciones permanentes ---
+    // --- NUEVA función para limpiar selecciones permanentes - ACTUALIZADA ---
     function limpiarSeleccionesPermanentes() {
         seleccionesPermanentes = {
             cpu: {},
             ram: {},
-            almacenamiento: {}
+            almacenamiento: {},
+            tarjeta_video: {} // NUEVO
         };
         console.log("🧹 Selecciones permanentes limpiadas");
     }
@@ -419,7 +475,7 @@ document.addEventListener("DOMContentLoaded", function () {
         console.log(`✅ ${cantidad} slots de ${tipo} generados correctamente`);
     }
 
-    // --- abrir modal "Nuevo" - ACTUALIZADO para limpiar selecciones permanentes ---
+    // --- abrir modal "Nuevo" - ACTUALIZADO para tarjeta de video ---
     if (btnNuevo) {
         btnNuevo.addEventListener("click", function () {
             if (!modal) return;
@@ -460,6 +516,7 @@ document.addEventListener("DOMContentLoaded", function () {
             document.getElementById('slots_cpu').value = 1;
             document.getElementById('slots_ram').value = 2;
             document.getElementById('slots_almacenamiento').value = 1;
+            document.getElementById('slots_tarjeta_video').value = 0; // NUEVO: por defecto sin tarjeta de video
             
             // Resetear filtro de componentes
             tipoFiltroActual = 'todos';
@@ -671,7 +728,7 @@ document.addEventListener("DOMContentLoaded", function () {
             });
     }
 
-    // --- cargar componentes en slots específicos - MEJORADA para cargar en selecciones permanentes ---
+    // --- cargar componentes en slots específicos - ACTUALIZADA para tarjeta video ---
     function cargarComponentesEnSlots(slotsData) {
         // Limpiar selecciones permanentes antes de cargar desde BD
         limpiarSeleccionesPermanentes();
@@ -729,6 +786,26 @@ document.addEventListener("DOMContentLoaded", function () {
                                 tipo: almacenamientoSelect.options[almacenamientoSelect.selectedIndex]?.getAttribute('data-tipo') || ''
                             };
                             seleccionesPermanentes.almacenamiento[index] = valorData;
+                        }
+                    }
+                });
+            }
+            
+            // NUEVO: Cargar tarjetas de video
+            if (slotsData.tarjeta_video_slots && slotsData.tarjeta_video_slots.length > 0) {
+                slotsData.tarjeta_video_slots.forEach((slot, index) => {
+                    const tvSelect = document.querySelector(`select[data-tipo="tarjeta_video"][data-slot="${index}"]`);
+                    if (tvSelect && slot.componente) {
+                        const optionExists = Array.from(tvSelect.options).some(option => option.value === slot.componente);
+                        if (optionExists) {
+                            tvSelect.value = slot.componente;
+                            // Guardar en selecciones permanentes
+                            const valorData = {
+                                valor: slot.componente,
+                                texto: tvSelect.options[tvSelect.selectedIndex]?.text || '',
+                                tipo: tvSelect.options[tvSelect.selectedIndex]?.getAttribute('data-tipo') || ''
+                            };
+                            seleccionesPermanentes.tarjeta_video[index] = valorData;
                         }
                     }
                 });
@@ -856,6 +933,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 alert("Debe asignar al menos un dispositivo de almacenamiento a un slot");
                 return false;
             }
+            
+            // No validamos tarjetas de video obligatorias, pueden ser 0
             
             const slotsDataInput = document.getElementById('slotsDataHidden');
             if (slotsDataInput) {
@@ -991,7 +1070,7 @@ document.addEventListener("DOMContentLoaded", function () {
         console.log("✅ Sistema de gestión de laptops cargado correctamente");
     });
     
-    // --- funciones de filtro - ULTRA MEJORADAS ---
+    // --- funciones de filtro - ACTUALIZADAS para tarjeta de video ---
     function aplicarFiltroASlots() {
         console.log("🔄 === APLICANDO FILTRO A SLOTS ===");
         console.log("Filtro actual:", tipoFiltroActual);
@@ -1028,6 +1107,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 break;
             case 'almacenamiento':
                 sourceSelect = document.getElementById('source-almacenamiento');
+                break;
+            case 'tarjeta_video': // NUEVO
+                sourceSelect = document.getElementById('source-tarjeta_video');
                 break;
         }
         
@@ -1087,12 +1169,19 @@ document.addEventListener("DOMContentLoaded", function () {
         const cpuSlots = parseInt(document.getElementById('slots_cpu').value) || 1;
         const ramSlots = parseInt(document.getElementById('slots_ram').value) || 2;
         const almacenamientoSlots = parseInt(document.getElementById('slots_almacenamiento').value) || 1;
+        const tarjeta_videoSlots = parseInt(document.getElementById('slots_tarjeta_video').value) || 0; // NUEVO
         
-        console.log("📊 Nueva configuración de slots:", { cpuSlots, ramSlots, almacenamientoSlots });
+        console.log("📊 Nueva configuración de slots:", { 
+            cpuSlots, 
+            ramSlots, 
+            almacenamientoSlots, 
+            tarjeta_videoSlots // NUEVO
+        });
         
         slotsData.cpu = cpuSlots;
         slotsData.ram = ramSlots;
         slotsData.almacenamiento = almacenamientoSlots;
+        slotsData.tarjeta_video = tarjeta_videoSlots; // NUEVO
         
         const container = document.getElementById('slots-container');
         if (container) {
@@ -1102,6 +1191,7 @@ document.addEventListener("DOMContentLoaded", function () {
             generarSlotsHTML('cpu', cpuSlots);
             generarSlotsHTML('ram', ramSlots);
             generarSlotsHTML('almacenamiento', almacenamientoSlots);
+            generarSlotsHTML('tarjeta_video', tarjeta_videoSlots); // NUEVO
         }
         
         // RESTAURAR valores después de regenerar

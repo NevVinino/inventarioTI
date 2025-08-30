@@ -220,7 +220,7 @@ if ($_SERVER["REQUEST_METHOD"] === "GET" && isset($_GET['obtener_slots'])) {
     }
 
     try {
-        // Obtener información de slots y sus componentes
+        // Obtener información de slots y sus componentes - ACTUALIZADO para tarjeta de video
         $sql = "
         SELECT 
             sa.id_slot,
@@ -243,11 +243,18 @@ if ($_SERVER["REQUEST_METHOD"] === "GET" && isset($_GET['obtener_slots'])) {
                 WHEN saa.id_almacenamiento IS NOT NULL THEN CONCAT('detallado_', saa.id_almacenamiento)
                 WHEN saa.id_almacenamiento_generico IS NOT NULL THEN CONCAT('generico_', saa.id_almacenamiento_generico)
                 ELSE NULL
-            END as almacenamiento_componente
+            END as almacenamiento_componente,
+            -- NUEVO: Información de tarjeta de video
+            CASE 
+                WHEN satv.id_tarjeta_video IS NOT NULL THEN CONCAT('detallado_', satv.id_tarjeta_video)
+                WHEN satv.id_tarjeta_video_generico IS NOT NULL THEN CONCAT('generico_', satv.id_tarjeta_video_generico)
+                ELSE NULL
+            END as tarjeta_video_componente
         FROM slot_activo sa
         LEFT JOIN slot_activo_procesador sap ON sa.id_slot = sap.id_slot
         LEFT JOIN slot_activo_ram sar ON sa.id_slot = sar.id_slot
         LEFT JOIN slot_activo_almacenamiento saa ON sa.id_slot = saa.id_slot
+        LEFT JOIN slot_activo_tarjeta_video satv ON sa.id_slot = satv.id_slot
         WHERE sa.id_activo = ?
         ORDER BY sa.tipo_slot, sa.id_slot
         ";
@@ -258,14 +265,16 @@ if ($_SERVER["REQUEST_METHOD"] === "GET" && isset($_GET['obtener_slots'])) {
             throw new Exception("Error en consulta de slots: " . print_r(sqlsrv_errors(), true));
         }
         
-        // Organizar datos por tipo de slot
+        // Organizar datos por tipo de slot - ACTUALIZADO para tarjeta de video
         $slots_organizados = [
             'cpu_slots' => [],
             'ram_slots' => [],
             'almacenamiento_slots' => [],
+            'tarjeta_video_slots' => [], // NUEVO
             'cpu_count' => 0,
             'ram_count' => 0,
-            'almacenamiento_count' => 0
+            'almacenamiento_count' => 0,
+            'tarjeta_video_count' => 0  // NUEVO
         ];
         
         while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
@@ -290,6 +299,11 @@ if ($_SERVER["REQUEST_METHOD"] === "GET" && isset($_GET['obtener_slots'])) {
                     $slot_info['componente'] = $row['almacenamiento_componente'];
                     $slots_organizados['almacenamiento_slots'][] = $slot_info;
                     $slots_organizados['almacenamiento_count']++;
+                    break;
+                case 'TARJETA_VIDEO': // NUEVO
+                    $slot_info['componente'] = $row['tarjeta_video_componente'];
+                    $slots_organizados['tarjeta_video_slots'][] = $slot_info;
+                    $slots_organizados['tarjeta_video_count']++;
                     break;
             }
         }
@@ -438,12 +452,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
 
     if ($accion === "crear") {
-        // Obtener configuración de slots
+        // Obtener configuración de slots - ACTUALIZADO para tarjeta video
         $slots_cpu = (isset($_POST["slots_cpu"]) && $_POST["slots_cpu"] !== '') ? (int)$_POST["slots_cpu"] : 1;
         $slots_ram = (isset($_POST["slots_ram"]) && $_POST["slots_ram"] !== '') ? (int)$_POST["slots_ram"] : 2;
         $slots_almacenamiento = (isset($_POST["slots_almacenamiento"]) && $_POST["slots_almacenamiento"] !== '') ? (int)$_POST["slots_almacenamiento"] : 1;
+        $slots_tarjeta_video = (isset($_POST["slots_tarjeta_video"]) && $_POST["slots_tarjeta_video"] !== '') ? (int)$_POST["slots_tarjeta_video"] : 0; // NUEVO
         
-        // Validar límites de slots
+        // Validar límites de slots - ACTUALIZADO para tarjeta video
         if ($slots_cpu < 1 || $slots_cpu > 2) {
             die("❌ Error: Cantidad de slots de CPU debe estar entre 1 y 2.");
         }
@@ -452,6 +467,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         }
         if ($slots_almacenamiento < 1 || $slots_almacenamiento > 4) {
             die("❌ Error: Cantidad de slots de almacenamiento debe estar entre 1 y 4.");
+        }
+        if ($slots_tarjeta_video < 0 || $slots_tarjeta_video > 2) { // NUEVO
+            die("❌ Error: Cantidad de slots de tarjeta de video debe estar entre 0 y 2.");
         }
 
         // Validar que el número de serie no exista
@@ -557,8 +575,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             if ($stmt_get_activo_id && $row_activo = sqlsrv_fetch_array($stmt_get_activo_id, SQLSRV_FETCH_ASSOC)) {
                 $id_activo_nuevo = $row_activo['id_activo'];
                 
-                // Crear slots
-                crearSlots($id_activo_nuevo, 'Laptop', $slots_cpu, $slots_ram, $slots_almacenamiento, $conn);
+                // Crear slots - ACTUALIZADO para tarjeta video
+                crearSlots($id_activo_nuevo, 'Laptop', $slots_cpu, $slots_ram, $slots_almacenamiento, $slots_tarjeta_video, $conn);
                 
                 // Procesar datos de slots desde el frontend
                 $slots_data = isset($_POST['slots_data']) ? json_decode($_POST['slots_data'], true) : [];
@@ -601,6 +619,25 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                                 } catch (Exception $e) {
                                     if (strpos($e->getMessage(), 'No hay slots disponibles') !== false) {
                                         error_log("Advertencia: No hay más slots de almacenamiento disponibles. Almacenamiento: $almacenamiento_data no asignado.");
+                                        break;
+                                    } else {
+                                        throw $e;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // NUEVO: Asignar Tarjetas de Video
+                    if (isset($slots_data['tarjetas_video']) && is_array($slots_data['tarjetas_video'])) {
+                        foreach ($slots_data['tarjetas_video'] as $tarjeta_video_data) {
+                            if (!empty($tarjeta_video_data)) {
+                                try {
+                                    error_log("Asignando Tarjeta de Video: " . $tarjeta_video_data);
+                                    asignarComponenteASlot($id_activo_nuevo, 'TARJETA_VIDEO', $tarjeta_video_data, $conn);
+                                } catch (Exception $e) {
+                                    if (strpos($e->getMessage(), 'No hay slots disponibles') !== false) {
+                                        error_log("Advertencia: No hay más slots de tarjeta de video disponibles. Tarjeta: $tarjeta_video_data no asignada.");
                                         break;
                                     } else {
                                         throw $e;
@@ -688,11 +725,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     throw new Exception("Error updating laptop: " . print_r(sqlsrv_errors(), true));
                 }
 
-                // Limpiar slots existentes (liberar componentes)
+                // Limpiar slots existentes (liberar componentes) - ACTUALIZADO para tarjeta de video
                 $sql_limpiar_slots = "
                     DELETE FROM slot_activo_procesador WHERE id_slot IN (SELECT id_slot FROM slot_activo WHERE id_activo = ?);
                     DELETE FROM slot_activo_ram WHERE id_slot IN (SELECT id_slot FROM slot_activo WHERE id_activo = ?);
                     DELETE FROM slot_activo_almacenamiento WHERE id_slot IN (SELECT id_slot FROM slot_activo WHERE id_activo = ?);
+                    DELETE FROM slot_activo_tarjeta_video WHERE id_slot IN (SELECT id_slot FROM slot_activo WHERE id_activo = ?);
                     UPDATE slot_activo SET estado = 'disponible' WHERE id_activo = ?;
                 ";
                 
@@ -735,6 +773,23 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                             if (!empty($almacenamiento_data)) {
                                 try {
                                     asignarComponenteASlot($id_activo, 'ALMACENAMIENTO', $almacenamiento_data, $conn);
+                                } catch (Exception $e) {
+                                    if (strpos($e->getMessage(), 'No hay slots disponibles') !== false) {
+                                        break;
+                                    } else {
+                                        throw $e;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // NUEVO: Reasignar Tarjetas de Video
+                    if (isset($slots_data['tarjetas_video']) && is_array($slots_data['tarjetas_video'])) {
+                        foreach ($slots_data['tarjetas_video'] as $tarjeta_video_data) {
+                            if (!empty($tarjeta_video_data)) {
+                                try {
+                                    asignarComponenteASlot($id_activo, 'TARJETA_VIDEO', $tarjeta_video_data, $conn);
                                 } catch (Exception $e) {
                                     if (strpos($e->getMessage(), 'No hay slots disponibles') !== false) {
                                         break;
@@ -794,11 +849,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
             // Eliminar registros en orden correcto (respetando foreign keys)
             
-            // 1. Eliminar relaciones de slots con componentes
+            // 1. Eliminar relaciones de slots con componentes - ACTUALIZADO para tarjeta de video
             $sql_delete_slot_relations = "
                 DELETE FROM slot_activo_procesador WHERE id_slot IN (SELECT id_slot FROM slot_activo WHERE id_activo = ?);
                 DELETE FROM slot_activo_ram WHERE id_slot IN (SELECT id_slot FROM slot_activo WHERE id_activo = ?);
                 DELETE FROM slot_activo_almacenamiento WHERE id_slot IN (SELECT id_slot FROM slot_activo WHERE id_activo = ?);
+                DELETE FROM slot_activo_tarjeta_video WHERE id_slot IN (SELECT id_slot FROM slot_activo WHERE id_activo = ?);
             ";
             
             $stmts = explode(';', $sql_delete_slot_relations);
@@ -861,12 +917,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     exit;
 }
 
-// Función para crear slots de un activo
-function crearSlots($id_activo, $tipo_activo, $slots_cpu, $slots_ram, $slots_almacenamiento, $conn) {
+// Función para crear slots de un activo - ACTUALIZADO para tarjetas de video
+function crearSlots($id_activo, $tipo_activo, $slots_cpu, $slots_ram, $slots_almacenamiento, $slots_tarjeta_video, $conn) {
     $tipos_slots = [
         'PROCESADOR' => $slots_cpu,
         'RAM' => $slots_ram,
-        'ALMACENAMIENTO' => $slots_almacenamiento
+        'ALMACENAMIENTO' => $slots_almacenamiento,
+        'TARJETA_VIDEO' => $slots_tarjeta_video // NUEVO
     ];
     
     foreach ($tipos_slots as $tipo_slot => $cantidad) {
@@ -881,7 +938,7 @@ function crearSlots($id_activo, $tipo_activo, $slots_cpu, $slots_ram, $slots_alm
     }
 }
 
-// Función para asignar componente a slot - CORREGIDA para usar tablas existentes
+// Función para asignar componente a slot - ACTUALIZADA para tarjetas de video
 function asignarComponenteASlot($id_activo, $tipo_slot, $componente_data, $conn) {
     // Parsear el componente_data que viene como "tipo_id" (ej: "detallado_5" o "generico_3")
     list($tipo_componente, $componente_id) = explode('_', $componente_data);
@@ -925,6 +982,14 @@ function asignarComponenteASlot($id_activo, $tipo_slot, $componente_data, $conn)
                 $campo_componente = 'id_almacenamiento_generico';
             } else {
                 $campo_componente = 'id_almacenamiento';
+            }
+            break;
+        case 'TARJETA_VIDEO': // NUEVO
+            $tabla_slot = 'slot_activo_tarjeta_video';
+            if ($tipo_componente == 'generico') {
+                $campo_componente = 'id_tarjeta_video_generico';
+            } else {
+                $campo_componente = 'id_tarjeta_video';
             }
             break;
     }

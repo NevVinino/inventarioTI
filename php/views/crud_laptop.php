@@ -51,11 +51,26 @@ $sql_almacenamiento = "
     FROM almacenamiento_generico
     ORDER BY descripcion";
 
+// NUEVA consulta para tarjetas de video
+$sql_tarjeta_video = "
+    SELECT id_tarjeta_video as id, 
+           CONCAT(m.nombre, ' ', tv.modelo, ISNULL(' ' + tv.memoria, ''), ISNULL(' ' + tv.tipo_memoria, '')) as descripcion, 
+           'detallado' as tipo
+    FROM tarjeta_video tv
+    LEFT JOIN marca m ON tv.id_marca = m.id_marca
+    UNION ALL
+    SELECT id_tarjeta_video_generico as id, 
+           CONCAT(modelo, ISNULL(' ' + memoria, '')) as descripcion, 
+           'generico' as tipo
+    FROM tarjeta_video_generico
+    ORDER BY descripcion";
+
 $cpus = sqlsrv_query($conn, $sql_cpu);
 $rams = sqlsrv_query($conn, $sql_ram);
 $almacenamientos = sqlsrv_query($conn, $sql_almacenamiento);
+$tarjetas_video = sqlsrv_query($conn, $sql_tarjeta_video); // NUEVO
 
-// Mejorar la consulta para incluir información de slots
+// Mejorar la consulta para incluir información de slots - ACTUALIZADO para incluir tarjetas de video
 $sql = "
 SELECT DISTINCT
     a.id_activo,
@@ -120,7 +135,23 @@ SELECT DISTINCT
         LEFT JOIN slot_activo_almacenamiento saa ON sa.id_slot = saa.id_slot
         LEFT JOIN almacenamiento s ON saa.id_almacenamiento = s.id_almacenamiento
         WHERE sa.id_activo = a.id_activo AND sa.tipo_slot = 'ALMACENAMIENTO'
-    ) as slots_almacenamiento_texto
+    ) as slots_almacenamiento_texto,
+    -- NUEVO: Información de slots de tarjeta de video
+    (
+        SELECT STRING_AGG(
+            CASE 
+                WHEN satv.id_tarjeta_video IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', tv.modelo + ' ' + ISNULL(tv.memoria, ''))
+                WHEN satv.id_tarjeta_video_generico IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', tvg.modelo + ' ' + ISNULL(tvg.memoria, ''))
+                ELSE CONCAT('Slot ', sa.id_slot, ': Libre')
+            END, 
+            ', '
+        )
+        FROM slot_activo sa 
+        LEFT JOIN slot_activo_tarjeta_video satv ON sa.id_slot = satv.id_slot
+        LEFT JOIN tarjeta_video tv ON satv.id_tarjeta_video = tv.id_tarjeta_video
+        LEFT JOIN tarjeta_video_generico tvg ON satv.id_tarjeta_video_generico = tvg.id_tarjeta_video_generico
+        WHERE sa.id_activo = a.id_activo AND sa.tipo_slot = 'TARJETA_VIDEO'
+    ) as slots_tarjeta_video_texto
 FROM activo a
 INNER JOIN laptop l ON a.id_laptop = l.id_laptop
 LEFT JOIN marca m ON l.id_marca = m.id_marca
@@ -450,6 +481,10 @@ $activos = $filas_temp;
                     
                     <label>Cantidad de slots de Almacenamiento:</label>
                     <input type="number" name="slots_almacenamiento" id="slots_almacenamiento" min="1" max="4" value="1" required>
+                    
+                    <!-- NUEVO: Slot para tarjeta de video -->
+                    <label>Cantidad de slots de Tarjeta de Video:</label>
+                    <input type="number" name="slots_tarjeta_video" id="slots_tarjeta_video" min="0" max="2" value="0">
                 </div>
 
                 <div id="slots-container" style="display: none;">
@@ -457,9 +492,10 @@ $activos = $filas_temp;
                     <div id="slots-cpu-container"></div>
                     <div id="slots-ram-container"></div>
                     <div id="slots-almacenamiento-container"></div>
+                    <div id="slots-tarjeta_video-container"></div> <!-- NUEVO -->
                 </div>
                 
-                <!-- Componentes disponibles para los slots - MEJORADO -->
+                <!-- Componentes disponibles para los slots - ACTUALIZADO con tarjetas de video -->
                 <div style="display: none;">
                     <select id="source-cpu" data-tipo-actual="todos">
                         <option value="">Seleccione un procesador...</option>
@@ -505,6 +541,21 @@ $activos = $filas_temp;
                                     data-descripcion="<?= htmlspecialchars($almacenamiento['descripcion']) ?>">
                                 <?= htmlspecialchars($almacenamiento['descripcion']) ?>
                                 <?= $almacenamiento['tipo'] == 'generico' ? ' (Genérico)' : ' (Detallado)' ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
+                    
+                    <!-- NUEVO: Select fuente para tarjetas de video -->
+                    <select id="source-tarjeta_video" data-tipo-actual="todos">
+                        <option value="">Seleccione tarjeta de video...</option>
+                        <?php 
+                        while ($tarjeta = sqlsrv_fetch_array($tarjetas_video, SQLSRV_FETCH_ASSOC)): 
+                        ?>
+                            <option value="<?= $tarjeta['tipo'] ?>_<?= $tarjeta['id'] ?>" 
+                                    data-tipo="<?= $tarjeta['tipo'] ?>"
+                                    data-descripcion="<?= htmlspecialchars($tarjeta['descripcion']) ?>">
+                                <?= htmlspecialchars($tarjeta['descripcion']) ?>
+                                <?= $tarjeta['tipo'] == 'generico' ? ' (Genérico)' : ' (Detallado)' ?>
                             </option>
                         <?php endwhile; ?>
                     </select>
@@ -574,6 +625,10 @@ $activos = $filas_temp;
             <div class="detalle-item">
                 <strong>Almacenamiento:</strong>
                 <span id="view-almacenamiento"></span>
+            </div>
+            <div class="detalle-item">
+                <strong>Tarjeta de Video:</strong>
+                <span id="view-tarjeta_video"></span>
             </div>
             <div class="detalle-item qr-container">
                 <strong>Código QR</strong>
