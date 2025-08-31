@@ -695,6 +695,26 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             die("❌ Error: El número de serie '$numberSerial' ya existe en otro laptop. Por favor, ingrese un número de serie único.");
         }
         
+        // NUEVO: Obtener configuración de slots para edición
+        $slots_cpu = (isset($_POST["slots_cpu"]) && $_POST["slots_cpu"] !== '') ? (int)$_POST["slots_cpu"] : 1;
+        $slots_ram = (isset($_POST["slots_ram"]) && $_POST["slots_ram"] !== '') ? (int)$_POST["slots_ram"] : 2;
+        $slots_almacenamiento = (isset($_POST["slots_almacenamiento"]) && $_POST["slots_almacenamiento"] !== '') ? (int)$_POST["slots_almacenamiento"] : 1;
+        $slots_tarjeta_video = (isset($_POST["slots_tarjeta_video"]) && $_POST["slots_tarjeta_video"] !== '') ? (int)$_POST["slots_tarjeta_video"] : 0;
+        
+        // Validar límites de slots para edición
+        if ($slots_cpu < 1 || $slots_cpu > 2) {
+            die("❌ Error: Cantidad de slots de CPU debe estar entre 1 y 2.");
+        }
+        if ($slots_ram < 1 || $slots_ram > 8) {
+            die("❌ Error: Cantidad de slots de RAM debe estar entre 1 y 8.");
+        }
+        if ($slots_almacenamiento < 1 || $slots_almacenamiento > 4) {
+            die("❌ Error: Cantidad de slots de almacenamiento debe estar entre 1 y 4.");
+        }
+        if ($slots_tarjeta_video < 0 || $slots_tarjeta_video > 2) {
+            die("❌ Error: Cantidad de slots de tarjeta de video debe estar entre 0 y 2.");
+        }
+        
         // Iniciar transacción para manejar componentes
         sqlsrv_begin_transaction($conn);
         
@@ -725,21 +745,27 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     throw new Exception("Error updating laptop: " . print_r(sqlsrv_errors(), true));
                 }
 
-                // Limpiar slots existentes (liberar componentes) - ACTUALIZADO para tarjeta de video
-                $sql_limpiar_slots = "
+                // NUEVO: Eliminar TODOS los slots existentes y recrearlos con la nueva configuración
+                $sql_limpiar_slots_completo = "
                     DELETE FROM slot_activo_procesador WHERE id_slot IN (SELECT id_slot FROM slot_activo WHERE id_activo = ?);
                     DELETE FROM slot_activo_ram WHERE id_slot IN (SELECT id_slot FROM slot_activo WHERE id_activo = ?);
                     DELETE FROM slot_activo_almacenamiento WHERE id_slot IN (SELECT id_slot FROM slot_activo WHERE id_activo = ?);
                     DELETE FROM slot_activo_tarjeta_video WHERE id_slot IN (SELECT id_slot FROM slot_activo WHERE id_activo = ?);
-                    UPDATE slot_activo SET estado = 'disponible' WHERE id_activo = ?;
+                    DELETE FROM slot_activo WHERE id_activo = ?;
                 ";
                 
-                $stmts = explode(';', $sql_limpiar_slots);
+                $stmts = explode(';', $sql_limpiar_slots_completo);
                 foreach ($stmts as $stmt_sql) {
                     if (trim($stmt_sql)) {
-                        sqlsrv_query($conn, trim($stmt_sql), [$id_activo]);
+                        $stmt_result = sqlsrv_query($conn, trim($stmt_sql), [$id_activo]);
+                        if ($stmt_result === false) {
+                            throw new Exception("Error eliminando slots existentes: " . print_r(sqlsrv_errors(), true));
+                        }
                     }
                 }
+                
+                // Crear slots con la nueva configuración
+                crearSlots($id_activo, 'Laptop', $slots_cpu, $slots_ram, $slots_almacenamiento, $slots_tarjeta_video, $conn);
                 
                 // Procesar datos de slots para edición
                 $slots_data = isset($_POST['slots_data']) ? json_decode($_POST['slots_data'], true) : [];
@@ -801,6 +827,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         }
                     }
                 }
+                
+                error_log("Laptop editado - Slots actualizados: CPU=$slots_cpu, RAM=$slots_ram, Almacenamiento=$slots_almacenamiento, Tarjeta_Video=$slots_tarjeta_video");
             }
             
             // Intentar regenerar QR (si falla, no revertimos la edición; solo registramos)
@@ -917,23 +945,29 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     exit;
 }
 
-// Función para crear slots de un activo - ACTUALIZADO para tarjetas de video
+// Función para crear slots de un activo - ACTUALIZADO para no crear slots con cantidad 0
 function crearSlots($id_activo, $tipo_activo, $slots_cpu, $slots_ram, $slots_almacenamiento, $slots_tarjeta_video, $conn) {
     $tipos_slots = [
         'PROCESADOR' => $slots_cpu,
         'RAM' => $slots_ram,
         'ALMACENAMIENTO' => $slots_almacenamiento,
-        'TARJETA_VIDEO' => $slots_tarjeta_video // NUEVO
+        'TARJETA_VIDEO' => $slots_tarjeta_video
     ];
     
     foreach ($tipos_slots as $tipo_slot => $cantidad) {
-        for ($i = 0; $i < $cantidad; $i++) {
-            $sql_slot = "INSERT INTO slot_activo (id_activo, tipo_activo, tipo_slot, estado) VALUES (?, ?, ?, 'disponible')";
-            $stmt = sqlsrv_query($conn, $sql_slot, [$id_activo, $tipo_activo, $tipo_slot]);
-            
-            if ($stmt === false) {
-                throw new Exception("Error creando slot $tipo_slot: " . print_r(sqlsrv_errors(), true));
+        // Solo crear slots si la cantidad es mayor a 0
+        if ($cantidad > 0) {
+            for ($i = 0; $i < $cantidad; $i++) {
+                $sql_slot = "INSERT INTO slot_activo (id_activo, tipo_activo, tipo_slot, estado) VALUES (?, ?, ?, 'disponible')";
+                $stmt = sqlsrv_query($conn, $sql_slot, [$id_activo, $tipo_activo, $tipo_slot]);
+                
+                if ($stmt === false) {
+                    throw new Exception("Error creando slot $tipo_slot: " . print_r(sqlsrv_errors(), true));
+                }
             }
+            error_log("Creados $cantidad slots de $tipo_slot para activo ID: $id_activo");
+        } else {
+            error_log("No se crearon slots de $tipo_slot para activo ID: $id_activo (cantidad = 0)");
         }
     }
 }

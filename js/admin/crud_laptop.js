@@ -432,6 +432,16 @@ document.addEventListener("DOMContentLoaded", function () {
         
         console.log(`🏗️ Generando ${cantidad} slots de ${tipo}`);
         
+        // Si la cantidad es 0, limpiar el contenedor y ocultar
+        if (cantidad <= 0) {
+            container.innerHTML = '';
+            container.style.display = 'none';
+            console.log(`❌ No se generaron slots de ${tipo} (cantidad = ${cantidad})`);
+            return;
+        }
+        
+        // Mostrar el contenedor si hay slots
+        container.style.display = 'block';
         container.innerHTML = `<h6>Slots de ${tipo.toUpperCase()} (${cantidad})</h6>`;
         
         for (let i = 0; i < cantidad; i++) {
@@ -599,7 +609,7 @@ document.addEventListener("DOMContentLoaded", function () {
                             downloadBtn.download = qrPath.split('/').pop();
                         }
                     } 
-                    else if (attr === 'cpu' || attr === 'ram' || attr === 'almacenamiento') {
+                    else if (attr === 'cpu' || attr === 'ram' || attr === 'almacenamiento' || attr === 'tarjeta_video') { // ACTUALIZADO
                         const componentes = this.dataset[attr].split(', ');
                         if (componentes.length > 0 && componentes[0] !== '') {
                             if (componentes.length > 1) {
@@ -693,14 +703,17 @@ document.addEventListener("DOMContentLoaded", function () {
                     document.getElementById('slots_cpu').value = data.slots.cpu_count || 1;
                     document.getElementById('slots_ram').value = data.slots.ram_count || 2;
                     document.getElementById('slots_almacenamiento').value = data.slots.almacenamiento_count || 1;
+                    document.getElementById('slots_tarjeta_video').value = data.slots.tarjeta_video_count || 0; // NUEVO
                     
                     const cpuSlots = parseInt(document.getElementById('slots_cpu').value) || 1;
                     const ramSlots = parseInt(document.getElementById('slots_ram').value) || 2;
                     const almacenamientoSlots = parseInt(document.getElementById('slots_almacenamiento').value) || 1;
+                    const tarjetaVideoSlots = parseInt(document.getElementById('slots_tarjeta_video').value) || 0; // NUEVO
                     
                     slotsData.cpu = cpuSlots;
                     slotsData.ram = ramSlots;
                     slotsData.almacenamiento = almacenamientoSlots;
+                    slotsData.tarjeta_video = tarjetaVideoSlots; // NUEVO
                     
                     const container = document.getElementById('slots-container');
                     if (container) {
@@ -709,6 +722,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         generarSlotsHTML('cpu', cpuSlots);
                         generarSlotsHTML('ram', ramSlots);
                         generarSlotsHTML('almacenamiento', almacenamientoSlots);
+                        generarSlotsHTML('tarjeta_video', tarjetaVideoSlots); // NUEVO
                     }
                     
                     cargarComponentesEnSlots(data.slots);
@@ -716,6 +730,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     document.getElementById('slots_cpu').value = 1;
                     document.getElementById('slots_ram').value = 2;
                     document.getElementById('slots_almacenamiento').value = 1;
+                    document.getElementById('slots_tarjeta_video').value = 0; // NUEVO
                     actualizarVistaSlots();
                 }
             })
@@ -724,6 +739,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 document.getElementById('slots_cpu').value = 1;
                 document.getElementById('slots_ram').value = 2;
                 document.getElementById('slots_almacenamiento').value = 1;
+                document.getElementById('slots_tarjeta_video').value = 0; // NUEVO
                 actualizarVistaSlots();
             });
     }
@@ -815,7 +831,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }, 100);
     }
 
-    // --- editar activo - ACTUALIZADO para limpiar selecciones permanentes ---
+    // --- editar activo - ACTUALIZADO para cargar slots de edición ---
     document.querySelectorAll(".btn-editar").forEach(function (btn) {
         btn.addEventListener("click", function () {
             if (!modal) return;
@@ -944,6 +960,22 @@ document.addEventListener("DOMContentLoaded", function () {
                 return false;
             }
             
+            // NUEVO: Agregar explícitamente los valores de configuración de slots al FormData
+            const formData = new FormData(form);
+            
+            // Asegurar que los valores de slots se envíen
+            formData.set('slots_cpu', document.getElementById('slots_cpu').value);
+            formData.set('slots_ram', document.getElementById('slots_ram').value);
+            formData.set('slots_almacenamiento', document.getElementById('slots_almacenamiento').value);
+            formData.set('slots_tarjeta_video', document.getElementById('slots_tarjeta_video').value);
+            
+            console.log("Configuración de slots enviada:", {
+                slots_cpu: document.getElementById('slots_cpu').value,
+                slots_ram: document.getElementById('slots_ram').value,
+                slots_almacenamiento: document.getElementById('slots_almacenamiento').value,
+                slots_tarjeta_video: document.getElementById('slots_tarjeta_video').value
+            });
+            
             const nombreEquipo = document.getElementById("nombreEquipo");
             const modelo = document.getElementById("modelo");
             const serial = document.getElementById("numberSerial");
@@ -970,8 +1002,6 @@ document.addEventListener("DOMContentLoaded", function () {
             const originalText = submitBtn.textContent;
             submitBtn.disabled = true;
             submitBtn.textContent = 'Guardando...';
-            
-            const formData = new FormData(form);
             
             fetch('../controllers/procesar_laptop.php', {
                 method: 'POST',

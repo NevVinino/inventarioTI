@@ -353,9 +353,6 @@ $activos = $filas_temp;
                             data-marca="<?= htmlspecialchars($a['id_marca'] ?? '') ?>"
                             data-estadoactivo="<?= htmlspecialchars($a['id_estado_activo'] ?? '') ?>"
                             data-empresa="<?= htmlspecialchars($a['id_empresa'] ?? '') ?>"
-                            data-cpus="<?= htmlspecialchars($a['cpus_data'] ?? '') ?>"
-                            data-rams="<?= htmlspecialchars($a['rams_data'] ?? '') ?>"
-                            data-almacenamientos="<?= htmlspecialchars($a['almacenamientos_data'] ?? '') ?>"
                         >
                             <img src="../../img/editar.png" alt="Editar">
                         </button>
@@ -477,12 +474,12 @@ $activos = $filas_temp;
                     <input type="number" name="slots_cpu" id="slots_cpu" min="1" max="2" value="1" required>
                     
                     <label>Cantidad de slots de RAM:</label>
-                    <input type="number" name="slots_ram" id="slots_ram" min="1" max="8" value="2" required>
+                    <input type="number" name="slots_ram" id="slots_ram" min="1" max="4" value="2" required>
                     
                     <label>Cantidad de slots de Almacenamiento:</label>
-                    <input type="number" name="slots_almacenamiento" id="slots_almacenamiento" min="1" max="4" value="1" required>
+                    <input type="number" name="slots_almacenamiento" id="slots_almacenamiento" min="1" max="2" value="1" required>
                     
-                    <!-- NUEVO: Slot para tarjeta de video -->
+                    <!-- NUEVO: Agregar campo para tarjetas de video en laptops -->
                     <label>Cantidad de slots de Tarjeta de Video:</label>
                     <input type="number" name="slots_tarjeta_video" id="slots_tarjeta_video" min="0" max="2" value="0">
                 </div>
@@ -500,7 +497,6 @@ $activos = $filas_temp;
                     <select id="source-cpu" data-tipo-actual="todos">
                         <option value="">Seleccione un procesador...</option>
                         <?php 
-                        // Reset cursor for CPU
                         $cpus = sqlsrv_query($conn, $sql_cpu);
                         while ($cpu = sqlsrv_fetch_array($cpus, SQLSRV_FETCH_ASSOC)): 
                         ?>
@@ -516,7 +512,6 @@ $activos = $filas_temp;
                     <select id="source-ram" data-tipo-actual="todos">
                         <option value="">Seleccione memoria RAM...</option>
                         <?php 
-                        // Reset cursor for RAM
                         $rams = sqlsrv_query($conn, $sql_ram);
                         while ($ram = sqlsrv_fetch_array($rams, SQLSRV_FETCH_ASSOC)): 
                         ?>
@@ -532,7 +527,6 @@ $activos = $filas_temp;
                     <select id="source-almacenamiento" data-tipo-actual="todos">
                         <option value="">Seleccione almacenamiento...</option>
                         <?php 
-                        // Reset cursor for Storage
                         $almacenamientos = sqlsrv_query($conn, $sql_almacenamiento);
                         while ($almacenamiento = sqlsrv_fetch_array($almacenamientos, SQLSRV_FETCH_ASSOC)): 
                         ?>
@@ -545,7 +539,7 @@ $activos = $filas_temp;
                         <?php endwhile; ?>
                     </select>
                     
-                    <!-- NUEVO: Select fuente para tarjetas de video -->
+                    <!-- NUEVO: Select para tarjetas de video -->
                     <select id="source-tarjeta_video" data-tipo-actual="todos">
                         <option value="">Seleccione tarjeta de video...</option>
                         <?php 
@@ -626,6 +620,7 @@ $activos = $filas_temp;
                 <strong>Almacenamiento:</strong>
                 <span id="view-almacenamiento"></span>
             </div>
+            <!-- NUEVO: Agregar campo para ver tarjetas de video -->
             <div class="detalle-item">
                 <strong>Tarjeta de Video:</strong>
                 <span id="view-tarjeta_video"></span>
