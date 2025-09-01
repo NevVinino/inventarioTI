@@ -576,6 +576,7 @@ document.addEventListener("DOMContentLoaded", function () {
         btn.addEventListener("click", function () {
             if (!modalView) return;
 
+            // Limpiar todos los campos antes de llenar
             document.querySelectorAll('#modalVisualizacion .detalle-item span').forEach(span => {
                 span.textContent = 'No especificado';
                 if (span.id === 'view-estado') {
@@ -587,53 +588,198 @@ document.addEventListener("DOMContentLoaded", function () {
                 div.innerHTML = '';
             });
             
+            // Limpiar observaciones
+            const observacionesDiv = document.getElementById('view-observaciones');
+            if (observacionesDiv) {
+                observacionesDiv.textContent = 'Sin observaciones';
+            }
+            
             const downloadBtn = document.getElementById('download-qr');
             if (downloadBtn) {
                 downloadBtn.style.display = 'none';
             }
             
+            // Función auxiliar para formatear fechas
+            function formatearFecha(fecha) {
+                if (!fecha || fecha === '') return 'No especificado';
+                try {
+                    const fechaObj = new Date(fecha);
+                    if (isNaN(fechaObj.getTime())) return 'Fecha inválida';
+                    return fechaObj.toLocaleDateString('es-ES', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
+                } catch (e) {
+                    return 'Fecha inválida';
+                }
+            }
+            
+            // Función auxiliar para formatear precios
+            function formatearPrecio(precio) {
+                if (!precio || precio === '' || precio === '0') return 'No especificado';
+                try {
+                    const precioNum = parseFloat(precio);
+                    if (isNaN(precioNum)) return 'Precio inválido';
+                    return new Intl.NumberFormat('es-PE', {
+                        style: 'currency',
+                        currency: 'PEN',
+                        minimumFractionDigits: 2
+                    }).format(precioNum);
+                } catch (e) {
+                    return 'S/ ' + precio;
+                }
+            }
+            
+            // Función auxiliar para formatear antigüedad
+            function formatearAntiguedad(antiguedadDias) {
+                if (!antiguedadDias || antiguedadDias === '' || antiguedadDias === '0') {
+                    return 'No calculado';
+                }
+                
+                const dias = parseInt(antiguedadDias);
+                if (isNaN(dias)) return 'No calculado';
+                
+                const años = Math.floor(dias / 365);
+                const restoDias = dias % 365;
+                const meses = Math.floor(restoDias / 30);
+                const diasFinales = restoDias % 30;
+                
+                const partes = [];
+                if (años > 0) partes.push(`${años} ${años === 1 ? "año" : "años"}`);
+                if (meses > 0) partes.push(`${meses} ${meses === 1 ? "mes" : "meses"}`);
+                if (diasFinales > 0 || partes.length === 0) partes.push(`${diasFinales} ${diasFinales === 1 ? "día" : "días"}`);
+                
+                return partes.join(", ");
+            }
+            
+            // NUEVA función para procesar información de slots y remover IDs (igual que laptops)
+            function procesarInfoSlots(infoSlots) {
+                if (!infoSlots || infoSlots === 'No especificado' || infoSlots.trim() === '') {
+                    return 'No especificado';
+                }
+                
+                // Dividir por comas para procesar cada slot individualmente
+                const slots = infoSlots.split(', ');
+                const slotsLimpios = slots.map(slot => {
+                    // Buscar patrón "Slot [número]: [información]" y reemplazar solo el número por texto genérico
+                    // Mantener toda la información después de los dos puntos
+                    const match = slot.match(/^Slot\s+\d+:\s*(.+)$/);
+                    if (match) {
+                        return 'Slot: ' + match[1]; // match[1] contiene todo después de los dos puntos
+                    }
+                    return slot; // Si no coincide con el patrón, devolver tal como está
+                });
+                
+                return slotsLimpios.join(', ');
+            }
+            
+            // Llenar campos básicos con validación y formato
             for (let attr in this.dataset) {
                 const element = document.getElementById('view-' + attr);
                 if (element) {
-                    if (attr === 'qr') {
-                        const qrPath = this.dataset[attr];
-                        element.innerHTML = `<img src="../../${qrPath}" alt="QR Code">`;
-
-                        if (downloadBtn) {
-                            downloadBtn.style.display = 'block';
-                            downloadBtn.href = "../../" + qrPath;
-                            downloadBtn.download = qrPath.split('/').pop();
-                        }
-                    } 
-                    else if (attr === 'cpu' || attr === 'ram' || attr === 'almacenamiento' || attr === 'tarjeta_video') { // NUEVO
-                        const componentes = this.dataset[attr].split(', ');
-                        if (componentes.length > 0 && componentes[0] !== '') {
-                            if (componentes.length > 1) {
-                                const ul = document.createElement('ul');
-                                ul.className = 'componentes-lista';
-                                
-                                componentes.forEach(componente => {
-                                    const li = document.createElement('li');
-                                    li.textContent = componente;
-                                    ul.appendChild(li);
-                                });
-                                
-                                element.innerHTML = '';
-                                element.appendChild(ul);
+                    let valor = this.dataset[attr] || 'No especificado';
+                    
+                    // Aplicar formato específico según el tipo de campo
+                    switch(attr) {
+                        case 'fechacompra':
+                        case 'garantia':
+                            valor = formatearFecha(valor);
+                            break;
+                        case 'preciocompra':
+                            valor = formatearPrecio(valor);
+                            break;
+                        case 'antiguedad':
+                            valor = formatearAntiguedad(valor);
+                            break;
+                        case 'estadogarantia':
+                            // Aplicar clase CSS según el estado
+                            if (valor.toLowerCase() === 'vigente') {
+                                element.className = 'estado-garantia-vigente';
+                            } else if (valor.toLowerCase() === 'no vigente') {
+                                element.className = 'estado-garantia-no-vigente';
                             } else {
-                                element.textContent = componentes[0];
+                                element.className = 'estado-garantia-sin';
                             }
-                        } else {
-                            element.textContent = 'No especificado';
-                        }
+                            break;
+                        case 'empresa':
+                            // Mostrar empresa o "No asignado" si está vacío
+                            if (!valor || valor === 'No especificado' || valor.trim() === '') {
+                                valor = 'No asignado';
+                            }
+                            break;
+                        case 'asistente':
+                            // Mostrar el nombre del asistente TI que registró el activo
+                            if (!valor || valor === 'No especificado' || valor.trim() === '') {
+                                valor = 'Usuario no identificado';
+                            }
+                            break;
+                        case 'qr':
+                            const qrPath = this.dataset[attr];
+                            element.innerHTML = `<img src="../../${qrPath}" alt="QR Code" class="qr-image">`;
+
+                            if (downloadBtn) {
+                                downloadBtn.style.display = 'block';
+                                downloadBtn.href = "../../" + qrPath;
+                                downloadBtn.download = qrPath.split('/').pop();
+                            }
+                            continue; // Skip setting textContent for QR
+                        case 'cpu':
+                        case 'ram':
+                        case 'almacenamiento':
+                        case 'tarjeta_video':
+                            // APLICAR procesamiento para remover IDs de slots
+                            const infoSlotsProcesada = procesarInfoSlots(this.dataset[attr]);
+                            const componentes = infoSlotsProcesada.split(', ');
+                            
+                            if (componentes.length > 0 && componentes[0] !== '' && componentes[0] !== 'No especificado') {
+                                if (componentes.length > 1) {
+                                    const ul = document.createElement('ul');
+                                    ul.className = 'componentes-lista';
+                                    
+                                    componentes.forEach(componente => {
+                                        const li = document.createElement('li');
+                                        li.textContent = componente;
+                                        ul.appendChild(li);
+                                    });
+                                    
+                                    element.innerHTML = '';
+                                    element.appendChild(ul);
+                                } else {
+                                    element.textContent = componentes[0];
+                                }
+                            } else {
+                                element.textContent = 'No especificado';
+                            }
+                            continue; // Skip setting textContent for components
+                        case 'estado':
+                            element.textContent = valor;
+                            element.setAttribute('data-estado', valor);
+                            continue;
+                        case 'observaciones':
+                            const observacionesElement = document.getElementById('view-observaciones');
+                            if (observacionesElement) {
+                                if (valor && valor !== 'No especificado' && valor.trim() !== '') {
+                                    observacionesElement.textContent = valor;
+                                    observacionesElement.className = 'observaciones-texto con-contenido';
+                                } else {
+                                    observacionesElement.textContent = 'Sin observaciones';
+                                    observacionesElement.className = 'observaciones-texto sin-contenido';
+                                }
+                            }
+                            continue;
+                        default:
+                            // Para campos de texto simples, aplicar capitalización si es apropiado
+                            if (valor !== 'No especificado' && typeof valor === 'string') {
+                                // Capitalizar primera letra para ciertos campos
+                                if (['nombreequipo', 'modelo', 'marca'].includes(attr)) {
+                                    valor = valor.charAt(0).toUpperCase() + valor.slice(1);
+                                }
+                            }
+                            break;
                     }
-                    else if (attr === 'estado') {
-                        element.textContent = this.dataset[attr] || 'No especificado';
-                        element.setAttribute('data-estado', this.dataset[attr]);
-                    }
-                    else {
-                        element.textContent = this.dataset[attr] || 'No especificado';
-                    }
+                    
+                    element.textContent = valor;
                 }
             }
 

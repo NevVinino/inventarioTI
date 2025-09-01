@@ -86,7 +86,7 @@ while ($fila = sqlsrv_fetch_array($asignaciones, SQLSRV_FETCH_ASSOC)) {
 <head>
     <meta charset="UTF-8">
     <title>Gestión de Asignaciones</title>
-    <link rel="stylesheet" href="../../css/admin/crud_admin.css">
+    <link rel="stylesheet" href="../../css/admin/admin_main.css">
 </head>
 <body>
 

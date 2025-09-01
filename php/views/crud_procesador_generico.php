@@ -11,7 +11,7 @@ $procesadores = sqlsrv_query($conn, $sqlProcesadores);
 <html>
     <head>
         <title>Gestión de Procesadores Genéricos</title>
-        <link rel="stylesheet" href="../../css/admin/crud_admin.css">
+        <link rel="stylesheet" href="../../css/admin/admin_main.css">
     </head> 
     <body>
         <header>

@@ -157,6 +157,123 @@ if ($_SERVER["REQUEST_METHOD"] === "GET" && isset($_GET['verificar_asignacion'])
     exit;
 }
 
+// NUEVO: Agregar endpoint para obtener información de slots
+if ($_SERVER["REQUEST_METHOD"] === "GET" && isset($_GET['obtener_slots'])) {
+    $id_activo = (int)($_GET['id_activo'] ?? 0);
+
+    if ($id_activo <= 0) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'ID de activo inválido']);
+        exit;
+    }
+
+    try {
+        // Obtener información de slots y sus componentes - ACTUALIZADO para tarjeta de video
+        $sql = "
+        SELECT 
+            sa.id_slot,
+            sa.tipo_slot,
+            sa.estado,
+            -- Información de procesador
+            CASE 
+                WHEN sap.id_procesador IS NOT NULL THEN CONCAT('detallado_', sap.id_procesador)
+                WHEN sap.id_procesador_generico IS NOT NULL THEN CONCAT('generico_', sap.id_procesador_generico)
+                ELSE NULL
+            END as procesador_componente,
+            -- Información de RAM
+            CASE 
+                WHEN sar.id_ram IS NOT NULL THEN CONCAT('detallado_', sar.id_ram)
+                WHEN sar.id_ram_generico IS NOT NULL THEN CONCAT('generico_', sar.id_ram_generico)
+                ELSE NULL
+            END as ram_componente,
+            -- Información de almacenamiento
+            CASE 
+                WHEN saa.id_almacenamiento IS NOT NULL THEN CONCAT('detallado_', saa.id_almacenamiento)
+                WHEN saa.id_almacenamiento_generico IS NOT NULL THEN CONCAT('generico_', saa.id_almacenamiento_generico)
+                ELSE NULL
+            END as almacenamiento_componente,
+            -- NUEVO: Información de tarjeta de video
+            CASE 
+                WHEN satv.id_tarjeta_video IS NOT NULL THEN CONCAT('detallado_', satv.id_tarjeta_video)
+                WHEN satv.id_tarjeta_video_generico IS NOT NULL THEN CONCAT('generico_', satv.id_tarjeta_video_generico)
+                ELSE NULL
+            END as tarjeta_video_componente
+        FROM slot_activo sa
+        LEFT JOIN slot_activo_procesador sap ON sa.id_slot = sap.id_slot
+        LEFT JOIN slot_activo_ram sar ON sa.id_slot = sar.id_slot
+        LEFT JOIN slot_activo_almacenamiento saa ON sa.id_slot = saa.id_slot
+        LEFT JOIN slot_activo_tarjeta_video satv ON sa.id_slot = satv.id_slot
+        WHERE sa.id_activo = ?
+        ORDER BY sa.tipo_slot, sa.id_slot
+        ";
+        
+        $stmt = sqlsrv_query($conn, $sql, [$id_activo]);
+        
+        if ($stmt === false) {
+            throw new Exception("Error en consulta de slots: " . print_r(sqlsrv_errors(), true));
+        }
+        
+        // Organizar datos por tipo de slot - ACTUALIZADO para tarjeta de video
+        $slots_organizados = [
+            'cpu_slots' => [],
+            'ram_slots' => [],
+            'almacenamiento_slots' => [],
+            'tarjeta_video_slots' => [],
+            'cpu_count' => 0,
+            'ram_count' => 0,
+            'almacenamiento_count' => 0,
+            'tarjeta_video_count' => 0
+        ];
+        
+        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+            $slot_info = [
+                'id_slot' => $row['id_slot'],
+                'estado' => $row['estado'],
+                'componente' => null
+            ];
+            
+            switch ($row['tipo_slot']) {
+                case 'PROCESADOR':
+                    $slot_info['componente'] = $row['procesador_componente'];
+                    $slots_organizados['cpu_slots'][] = $slot_info;
+                    $slots_organizados['cpu_count']++;
+                    break;
+                case 'RAM':
+                    $slot_info['componente'] = $row['ram_componente'];
+                    $slots_organizados['ram_slots'][] = $slot_info;
+                    $slots_organizados['ram_count']++;
+                    break;
+                case 'ALMACENAMIENTO':
+                    $slot_info['componente'] = $row['almacenamiento_componente'];
+                    $slots_organizados['almacenamiento_slots'][] = $slot_info;
+                    $slots_organizados['almacenamiento_count']++;
+                    break;
+                case 'TARJETA_VIDEO':
+                    $slot_info['componente'] = $row['tarjeta_video_componente'];
+                    $slots_organizados['tarjeta_video_slots'][] = $slot_info;
+                    $slots_organizados['tarjeta_video_count']++;
+                    break;
+            }
+        }
+        
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => true,
+            'slots' => $slots_organizados
+        ]);
+        exit;
+        
+    } catch (Exception $e) {
+        error_log("Error obteniendo slots de Servidor: " . $e->getMessage());
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+        exit;
+    }
+}
+
 // Procesar POST requests
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $accion = $_POST["accion"] ?? '';
@@ -215,8 +332,27 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $id_estado_activo = (isset($_POST["id_estado_activo"]) && $_POST["id_estado_activo"] !== '') ? $_POST["id_estado_activo"] : null;
         $id_empresa = (isset($_POST["id_empresa"]) && $_POST["id_empresa"] !== '') ? $_POST["id_empresa"] : null;
 
-        // Validaciones
+        // Debug logs - ACTUALIZADO para slots de servidor
+        if ($accion === "crear") {
+            error_log("=== DEBUG DATOS SERVIDOR RECIBIDOS ===");
+            error_log("Datos de slots recibidos: " . ($_POST["slots_data"] ?? 'NO ENVIADO'));
+            error_log("POST completo: " . print_r($_POST, true));
+        }
+
         if (in_array($accion, ['crear', 'editar'])) {
+            // Validar datos de slots en lugar de CPU individual
+            $slots_data = isset($_POST['slots_data']) ? json_decode($_POST['slots_data'], true) : [];
+            
+            if (empty($slots_data) || !isset($slots_data['cpu']) || empty($slots_data['cpu'])) {
+                error_log("Error Servidor: CPU no seleccionado en slots. slots_data = " . print_r($slots_data, true));
+                if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'error' => 'Debe seleccionar un procesador (CPU) en los slots']);
+                    exit;
+                }
+                die("❌ Error: Debe seleccionar un procesador (CPU) en los slots.");
+            }
+            
             if ($fechaCompra && $fechaCompra > date('Y-m-d')) {
                 die("❌ Error: La fecha de compra no puede ser posterior a hoy.");
             }
@@ -236,16 +372,32 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
 
     if ($accion === "crear") {
+        // Obtener configuración de slots - ADAPTADA PARA SERVIDOR
+        $slots_cpu = (isset($_POST["slots_cpu"]) && $_POST["slots_cpu"] !== '') ? (int)$_POST["slots_cpu"] : 2;
+        $slots_ram = (isset($_POST["slots_ram"]) && $_POST["slots_ram"] !== '') ? (int)$_POST["slots_ram"] : 8;
+        $slots_almacenamiento = (isset($_POST["slots_almacenamiento"]) && $_POST["slots_almacenamiento"] !== '') ? (int)$_POST["slots_almacenamiento"] : 4;
+        $slots_tarjeta_video = (isset($_POST["slots_tarjeta_video"]) && $_POST["slots_tarjeta_video"] !== '') ? (int)$_POST["slots_tarjeta_video"] : 0;
+        
+        // Validar límites de slots - ADAPTADA PARA SERVIDOR
+        if ($slots_cpu < 1 || $slots_cpu > 4) {
+            die("❌ Error: Cantidad de slots de CPU debe estar entre 1 y 4.");
+        }
+        if ($slots_ram < 2 || $slots_ram > 24) {
+            die("❌ Error: Cantidad de slots de RAM debe estar entre 2 y 24.");
+        }
+        if ($slots_almacenamiento < 2 || $slots_almacenamiento > 12) {
+            die("❌ Error: Cantidad de slots de almacenamiento debe estar entre 2 y 12.");
+        }
+        if ($slots_tarjeta_video < 0 || $slots_tarjeta_video > 8) {
+            die("❌ Error: Cantidad de slots de tarjeta de video debe estar entre 0 y 8.");
+        }
+
         // Validar que el número de serie no exista
         $sql_check_serial = "SELECT COUNT(*) as count FROM servidor WHERE numeroSerial = ?";
         $stmt_check_serial = sqlsrv_query($conn, $sql_check_serial, [$numberSerial]);
         
         if ($stmt_check_serial === false) {
-            // Verificar si es una petición AJAX - MEJORADA
-            $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
-                      strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
-            
-            if ($is_ajax) {
+            if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
                 header('Content-Type: application/json');
                 echo json_encode(['success' => false, 'error' => 'Error al verificar número de serie en la base de datos']);
                 exit;
@@ -255,11 +407,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         
         $row_serial = sqlsrv_fetch_array($stmt_check_serial, SQLSRV_FETCH_ASSOC);
         if ($row_serial['count'] > 0) {
-            // Verificar si es una petición AJAX - MEJORADA
-            $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
-                      strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
-            
-            if ($is_ajax) {
+            if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
                 header('Content-Type: application/json');
                 echo json_encode(['success' => false, 'error' => "El número de serie '$numberSerial' ya existe en la base de datos. Por favor, ingrese un número de serie único."]);
                 exit;
@@ -307,45 +455,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 }
             }
 
-            // Insertar componentes
-            $cpus = isset($_POST['cpus']) ? array_filter(explode(',', $_POST['cpus'])) : [];
-            $rams = isset($_POST['rams']) ? array_filter(explode(',', $_POST['rams'])) : [];
-            $almacenamientos = isset($_POST['almacenamientos']) ? array_filter(explode(',', $_POST['almacenamientos'])) : [];
-
-            // Insertar relaciones Servidor-componentes
-            foreach ($cpus as $cpu_id) {
-                $cpu_id = trim($cpu_id);
-                if (!empty($cpu_id) && is_numeric($cpu_id)) {
-                    $sql = "INSERT INTO servidor_procesador (id_servidor, id_cpu) VALUES (?, ?)";
-                    $stmt_cpu = sqlsrv_query($conn, $sql, [(int)$id_servidor, (int)$cpu_id]);
-                    if ($stmt_cpu === false) {
-                        throw new Exception("Error inserting Servidor CPU: " . print_r(sqlsrv_errors(), true));
-                    }
-                }
-            }
-
-            foreach ($rams as $ram_id) {
-                $ram_id = trim($ram_id);
-                if (!empty($ram_id) && is_numeric($ram_id)) {
-                    $sql = "INSERT INTO servidor_ram (id_servidor, id_ram) VALUES (?, ?)";
-                    $stmt_ram = sqlsrv_query($conn, $sql, [(int)$id_servidor, (int)$ram_id]);
-                    if ($stmt_ram === false) {
-                        throw new Exception("Error inserting Servidor RAM: " . print_r(sqlsrv_errors(), true));
-                    }
-                }
-            }
-
-            foreach ($almacenamientos as $almacenamiento_id) {
-                $almacenamiento_id = trim($almacenamiento_id);
-                if (!empty($almacenamiento_id) && is_numeric($almacenamiento_id)) {
-                    $sql = "INSERT INTO servidor_almacenamiento (id_servidor, id_almacenamiento) VALUES (?, ?)";
-                    $stmt_alm = sqlsrv_query($conn, $sql, [(int)$id_servidor, (int)$almacenamiento_id]);
-                    if ($stmt_alm === false) {
-                        throw new Exception("Error inserting Servidor Almacenamiento: " . print_r(sqlsrv_errors(), true));
-                    }
-                }
-            }
-
             // Insertar en tabla activo
             $sql_activo = "INSERT INTO activo (tipo_activo, id_servidor) VALUES ('Servidor', ?)";
             $stmt_activo = sqlsrv_query($conn, $sql_activo, [(int)$id_servidor]);
@@ -354,12 +463,89 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 throw new Exception("Error inserting activo: " . print_r(sqlsrv_errors(), true));
             }
             
-            // Obtener el ID del activo y generar QR
+            // Obtener el ID del activo y crear slots
             $sql_get_activo_id = "SELECT id_activo FROM activo WHERE id_servidor = ?";
             $stmt_get_activo_id = sqlsrv_query($conn, $sql_get_activo_id, [(int)$id_servidor]);
             
             if ($stmt_get_activo_id && $row_activo = sqlsrv_fetch_array($stmt_get_activo_id, SQLSRV_FETCH_ASSOC)) {
                 $id_activo_nuevo = $row_activo['id_activo'];
+                
+                // Crear slots
+                crearSlots($id_activo_nuevo, 'Servidor', $slots_cpu, $slots_ram, $slots_almacenamiento, $slots_tarjeta_video, $conn);
+                
+                // Procesar datos de slots desde el frontend
+                $slots_data = isset($_POST['slots_data']) ? json_decode($_POST['slots_data'], true) : [];
+                
+                error_log("Datos de slots Servidor procesados: " . print_r($slots_data, true));
+                
+                if (!empty($slots_data)) {
+                    // Asignar CPU
+                    if (isset($slots_data['cpu']) && !empty($slots_data['cpu'])) {
+                        error_log("Asignando CPU Servidor: " . $slots_data['cpu']);
+                        asignarComponenteASlot($id_activo_nuevo, 'PROCESADOR', $slots_data['cpu'], $conn);
+                    }
+                    
+                    // Asignar RAMs
+                    if (isset($slots_data['rams']) && is_array($slots_data['rams'])) {
+                        foreach ($slots_data['rams'] as $ram_data) {
+                            if (!empty($ram_data)) {
+                                try {
+                                    error_log("Asignando RAM Servidor: " . $ram_data);
+                                    asignarComponenteASlot($id_activo_nuevo, 'RAM', $ram_data, $conn);
+                                } catch (Exception $e) {
+                                    if (strpos($e->getMessage(), 'No hay slots disponibles') !== false) {
+                                        error_log("Advertencia: No hay más slots de RAM disponibles en Servidor. RAM: $ram_data no asignada.");
+                                        break;
+                                    } else {
+                                        throw $e;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Asignar Almacenamientos
+                    if (isset($slots_data['almacenamientos']) && is_array($slots_data['almacenamientos'])) {
+                        foreach ($slots_data['almacenamientos'] as $almacenamiento_data) {
+                            if (!empty($almacenamiento_data)) {
+                                try {
+                                    error_log("Asignando Almacenamiento Servidor: " . $almacenamiento_data);
+                                    asignarComponenteASlot($id_activo_nuevo, 'ALMACENAMIENTO', $almacenamiento_data, $conn);
+                                } catch (Exception $e) {
+                                    if (strpos($e->getMessage(), 'No hay slots disponibles') !== false) {
+                                        error_log("Advertencia: No hay más slots de almacenamiento disponibles en Servidor. Almacenamiento: $almacenamiento_data no asignado.");
+                                        break;
+                                    } else {
+                                        throw $e;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Asignar Tarjetas de Video
+                    if (isset($slots_data['tarjetas_video']) && is_array($slots_data['tarjetas_video'])) {
+                        foreach ($slots_data['tarjetas_video'] as $tarjeta_video_data) {
+                            if (!empty($tarjeta_video_data)) {
+                                try {
+                                    error_log("Asignando Tarjeta de Video Servidor: " . $tarjeta_video_data);
+                                    asignarComponenteASlot($id_activo_nuevo, 'TARJETA_VIDEO', $tarjeta_video_data, $conn);
+                                } catch (Exception $e) {
+                                    if (strpos($e->getMessage(), 'No hay slots disponibles') !== false) {
+                                        error_log("Advertencia: No hay más slots de tarjeta de video disponibles en Servidor. Tarjeta: $tarjeta_video_data no asignada.");
+                                        break;
+                                    } else {
+                                        throw $e;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    error_log("Error Servidor: No se recibieron datos de slots válidos");
+                }
+                
+                // Generar QR para el nuevo activo
                 $qr_result = generarQR($id_activo_nuevo, $conn);
                 if (!$qr_result) {
                     error_log("Error generando QR para Servidor ID: $id_activo_nuevo");
@@ -381,11 +567,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $stmt_check_serial = sqlsrv_query($conn, $sql_check_serial, [$numberSerial, $id_activo]);
         
         if ($stmt_check_serial === false) {
-            // Verificar si es una petición AJAX - MEJORADA
-            $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
-                      strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
-            
-            if ($is_ajax) {
+            if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
                 header('Content-Type: application/json');
                 echo json_encode(['success' => false, 'error' => 'Error al verificar número de serie en la base de datos']);
                 exit;
@@ -395,16 +577,32 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         
         $row_serial = sqlsrv_fetch_array($stmt_check_serial, SQLSRV_FETCH_ASSOC);
         if ($row_serial['count'] > 0) {
-            // Verificar si es una petición AJAX - MEJORADA
-            $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
-                      strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
-            
-            if ($is_ajax) {
+            if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
                 header('Content-Type: application/json');
                 echo json_encode(['success' => false, 'error' => "El número de serie '$numberSerial' ya existe en otro servidor. Por favor, ingrese un número de serie único."]);
                 exit;
             }
             die("❌ Error: El número de serie '$numberSerial' ya existe en otro servidor. Por favor, ingrese un número de serie único.");
+        }
+        
+        // Obtener configuración de slots para edición de Servidor
+        $slots_cpu = (isset($_POST["slots_cpu"]) && $_POST["slots_cpu"] !== '') ? (int)$_POST["slots_cpu"] : 2;
+        $slots_ram = (isset($_POST["slots_ram"]) && $_POST["slots_ram"] !== '') ? (int)$_POST["slots_ram"] : 8;
+        $slots_almacenamiento = (isset($_POST["slots_almacenamiento"]) && $_POST["slots_almacenamiento"] !== '') ? (int)$_POST["slots_almacenamiento"] : 4;
+        $slots_tarjeta_video = (isset($_POST["slots_tarjeta_video"]) && $_POST["slots_tarjeta_video"] !== '') ? (int)$_POST["slots_tarjeta_video"] : 0;
+        
+        // Validar límites de slots para edición de Servidor
+        if ($slots_cpu < 1 || $slots_cpu > 4) {
+            die("❌ Error: Cantidad de slots de CPU debe estar entre 1 y 4.");
+        }
+        if ($slots_ram < 2 || $slots_ram > 24) {
+            die("❌ Error: Cantidad de slots de RAM debe estar entre 2 y 24.");
+        }
+        if ($slots_almacenamiento < 2 || $slots_almacenamiento > 12) {
+            die("❌ Error: Cantidad de slots de almacenamiento debe estar entre 2 y 12.");
+        }
+        if ($slots_tarjeta_video < 0 || $slots_tarjeta_video > 8) {
+            die("❌ Error: Cantidad de slots de tarjeta de video debe estar entre 0 y 8.");
         }
         
         sqlsrv_begin_transaction($conn);
@@ -442,46 +640,87 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     throw new Exception("Error updating Servidor: " . print_r(sqlsrv_errors(), true));
                 }
 
-                // Actualizar componentes
-                $cpus = isset($_POST['cpus']) ? array_filter(explode(',', $_POST['cpus'])) : [];
-                $rams = isset($_POST['rams']) ? array_filter(explode(',', $_POST['rams'])) : [];
-                $almacenamientos = isset($_POST['almacenamientos']) ? array_filter(explode(',', $_POST['almacenamientos'])) : [];
-
-                // Eliminar componentes existentes
-                sqlsrv_query($conn, "DELETE FROM servidor_procesador WHERE id_servidor = ?", [$id_servidor]);
-                sqlsrv_query($conn, "DELETE FROM servidor_ram WHERE id_servidor = ?", [$id_servidor]);
-                sqlsrv_query($conn, "DELETE FROM servidor_almacenamiento WHERE id_servidor = ?", [$id_servidor]);
-
-                // Insertar nuevos componentes
-                foreach ($cpus as $cpu_id) {
-                    $cpu_id = trim($cpu_id);
-                    if (!empty($cpu_id) && is_numeric($cpu_id)) {
-                        $sql = "INSERT INTO servidor_procesador (id_servidor, id_cpu) VALUES (?, ?)";
-                        if (sqlsrv_query($conn, $sql, [$id_servidor, $cpu_id]) === false) {
-                            throw new Exception("Error inserting Servidor CPU: " . print_r(sqlsrv_errors(), true));
+                // Eliminar TODOS los slots existentes y recrearlos
+                $sql_limpiar_slots_completo = "
+                    DELETE FROM slot_activo_procesador WHERE id_slot IN (SELECT id_slot FROM slot_activo WHERE id_activo = ?);
+                    DELETE FROM slot_activo_ram WHERE id_slot IN (SELECT id_slot FROM slot_activo WHERE id_activo = ?);
+                    DELETE FROM slot_activo_almacenamiento WHERE id_slot IN (SELECT id_slot FROM slot_activo WHERE id_activo = ?);
+                    DELETE FROM slot_activo_tarjeta_video WHERE id_slot IN (SELECT id_slot FROM slot_activo WHERE id_activo = ?);
+                    DELETE FROM slot_activo WHERE id_activo = ?;
+                ";
+                
+                $stmts = explode(';', $sql_limpiar_slots_completo);
+                foreach ($stmts as $stmt_sql) {
+                    if (trim($stmt_sql)) {
+                        $stmt_result = sqlsrv_query($conn, trim($stmt_sql), [$id_activo]);
+                        if ($stmt_result === false) {
+                            throw new Exception("Error eliminando slots existentes Servidor: " . print_r(sqlsrv_errors(), true));
                         }
                     }
                 }
-
-                foreach ($rams as $ram_id) {
-                    $ram_id = trim($ram_id);
-                    if (!empty($ram_id) && is_numeric($ram_id)) {
-                        $sql = "INSERT INTO servidor_ram (id_servidor, id_ram) VALUES (?, ?)";
-                        if (sqlsrv_query($conn, $sql, [$id_servidor, $ram_id]) === false) {
-                            throw new Exception("Error inserting Servidor RAM: " . print_r(sqlsrv_errors(), true));
+                
+                // Crear slots con la nueva configuración
+                crearSlots($id_activo, 'Servidor', $slots_cpu, $slots_ram, $slots_almacenamiento, $slots_tarjeta_video, $conn);
+                
+                // Procesar datos de slots para edición
+                $slots_data = isset($_POST['slots_data']) ? json_decode($_POST['slots_data'], true) : [];
+                
+                if (!empty($slots_data)) {
+                    // Reasignar componentes
+                    if (isset($slots_data['cpu']) && !empty($slots_data['cpu'])) {
+                        asignarComponenteASlot($id_activo, 'PROCESADOR', $slots_data['cpu'], $conn);
+                    }
+                    
+                    if (isset($slots_data['rams']) && is_array($slots_data['rams'])) {
+                        foreach ($slots_data['rams'] as $ram_data) {
+                            if (!empty($ram_data)) {
+                                try {
+                                    asignarComponenteASlot($id_activo, 'RAM', $ram_data, $conn);
+                                } catch (Exception $e) {
+                                    if (strpos($e->getMessage(), 'No hay slots disponibles') !== false) {
+                                        break;
+                                    } else {
+                                        throw $e;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (isset($slots_data['almacenamientos']) && is_array($slots_data['almacenamientos'])) {
+                        foreach ($slots_data['almacenamientos'] as $almacenamiento_data) {
+                            if (!empty($almacenamiento_data)) {
+                                try {
+                                    asignarComponenteASlot($id_activo, 'ALMACENAMIENTO', $almacenamiento_data, $conn);
+                                } catch (Exception $e) {
+                                    if (strpos($e->getMessage(), 'No hay slots disponibles') !== false) {
+                                        break;
+                                    } else {
+                                        throw $e;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (isset($slots_data['tarjetas_video']) && is_array($slots_data['tarjetas_video'])) {
+                        foreach ($slots_data['tarjetas_video'] as $tarjeta_video_data) {
+                            if (!empty($tarjeta_video_data)) {
+                                try {
+                                    asignarComponenteASlot($id_activo, 'TARJETA_VIDEO', $tarjeta_video_data, $conn);
+                                } catch (Exception $e) {
+                                    if (strpos($e->getMessage(), 'No hay slots disponibles') !== false) {
+                                        break;
+                                    } else {
+                                        throw $e;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-
-                foreach ($almacenamientos as $almacenamiento_id) {
-                    $almacenamiento_id = trim($almacenamiento_id);
-                    if (!empty($almacenamiento_id) && is_numeric($almacenamiento_id)) {
-                        $sql = "INSERT INTO servidor_almacenamiento (id_servidor, id_almacenamiento) VALUES (?, ?)";
-                        if (sqlsrv_query($conn, $sql, [$id_servidor, $almacenamiento_id]) === false) {
-                            throw new Exception("Error inserting Servidor Almacenamiento: " . print_r(sqlsrv_errors(), true));
-                        }
-                    }
-                }
+                
+                error_log("Servidor editado - Slots actualizados: CPU=$slots_cpu, RAM=$slots_ram, Almacenamiento=$slots_almacenamiento, Tarjeta_Video=$slots_tarjeta_video");
             }
             
             sqlsrv_commit($conn);
@@ -492,28 +731,188 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             die("Error: " . $e->getMessage());
         }
     } elseif ($accion === "eliminar" && !empty($id_activo)) {
-        // Eliminar QR si existe
-        $sql_qr = "SELECT ruta_qr FROM qr_activo WHERE id_activo = ?";
-        $stmt_qr = sqlsrv_query($conn, $sql_qr, [$id_activo]);
-        if ($stmt_qr && $row = sqlsrv_fetch_array($stmt_qr, SQLSRV_FETCH_ASSOC)) {
-            $qr_file = "../../" . $row['ruta_qr'];
-            if (file_exists($qr_file)) {
-                unlink($qr_file);
+        sqlsrv_begin_transaction($conn);
+        
+        try {
+            // Obtener ID del servidor antes de eliminar el activo
+            $sql_get_servidor = "SELECT id_servidor FROM activo WHERE id_activo = ?";
+            $stmt_get_servidor = sqlsrv_query($conn, $sql_get_servidor, [$id_activo]);
+            
+            if (!$stmt_get_servidor) {
+                throw new Exception("Error obteniendo ID del servidor: " . print_r(sqlsrv_errors(), true));
             }
-        }
+            
+            $row_servidor = sqlsrv_fetch_array($stmt_get_servidor, SQLSRV_FETCH_ASSOC);
+            if (!$row_servidor) {
+                throw new Exception("No se encontró el servidor asociado al activo ID: $id_activo");
+            }
+            
+            $id_servidor = $row_servidor['id_servidor'];
+            
+            // Eliminar QR si existe
+            $sql_qr = "SELECT ruta_qr FROM qr_activo WHERE id_activo = ?";
+            $stmt_qr = sqlsrv_query($conn, $sql_qr, [$id_activo]);
+            if ($stmt_qr && $row = sqlsrv_fetch_array($stmt_qr, SQLSRV_FETCH_ASSOC)) {
+                $qr_file = "../../" . $row['ruta_qr'];
+                if (file_exists($qr_file)) {
+                    unlink($qr_file);
+                }
+            }
 
-        // Eliminar registros
-        sqlsrv_query($conn, "DELETE FROM qr_activo WHERE id_activo = ?", [$id_activo]);
-        $del1 = sqlsrv_query($conn, "DELETE FROM asignacion WHERE id_activo = ?", [$id_activo]);
-        $del2 = sqlsrv_query($conn, "DELETE FROM activo WHERE id_activo = ?", [$id_activo]);
-        if ($del1 === false || $del2 === false) {
-            die(print_r(sqlsrv_errors(), true));
+            // Eliminar registros en orden correcto
+            $sql_delete_slot_relations = "
+                DELETE FROM slot_activo_procesador WHERE id_slot IN (SELECT id_slot FROM slot_activo WHERE id_activo = ?);
+                DELETE FROM slot_activo_ram WHERE id_slot IN (SELECT id_slot FROM slot_activo WHERE id_activo = ?);
+                DELETE FROM slot_activo_almacenamiento WHERE id_slot IN (SELECT id_slot FROM slot_activo WHERE id_activo = ?);
+                DELETE FROM slot_activo_tarjeta_video WHERE id_slot IN (SELECT id_slot FROM slot_activo WHERE id_activo = ?);
+            ";
+            
+            $stmts = explode(';', $sql_delete_slot_relations);
+            foreach ($stmts as $stmt_sql) {
+                if (trim($stmt_sql)) {
+                    $stmt_delete = sqlsrv_query($conn, trim($stmt_sql), [$id_activo]);
+                    if ($stmt_delete === false) {
+                        throw new Exception("Error eliminando relaciones de slots Servidor: " . print_r(sqlsrv_errors(), true));
+                    }
+                }
+            }
+            
+            // Eliminar slots
+            $stmt_slots = sqlsrv_query($conn, "DELETE FROM slot_activo WHERE id_activo = ?", [$id_activo]);
+            if ($stmt_slots === false) {
+                throw new Exception("Error eliminando slots Servidor: " . print_r(sqlsrv_errors(), true));
+            }
+            
+            // Eliminar QR
+            $stmt_qr_delete = sqlsrv_query($conn, "DELETE FROM qr_activo WHERE id_activo = ?", [$id_activo]);
+            if ($stmt_qr_delete === false) {
+                throw new Exception("Error eliminando QR Servidor: " . print_r(sqlsrv_errors(), true));
+            }
+            
+            // Eliminar asignaciones
+            $del1 = sqlsrv_query($conn, "DELETE FROM asignacion WHERE id_activo = ?", [$id_activo]);
+            if ($del1 === false) {
+                throw new Exception("Error eliminando asignaciones Servidor: " . print_r(sqlsrv_errors(), true));
+            }
+            
+            // Eliminar activo
+            $del2 = sqlsrv_query($conn, "DELETE FROM activo WHERE id_activo = ?", [$id_activo]);
+            if ($del2 === false) {
+                throw new Exception("Error eliminando activo Servidor: " . print_r(sqlsrv_errors(), true));
+            }
+            
+            // Eliminar servidor
+            $stmt_servidor = sqlsrv_query($conn, "DELETE FROM servidor WHERE id_servidor = ?", [$id_servidor]);
+            if ($stmt_servidor === false) {
+                throw new Exception("Error eliminando servidor: " . print_r(sqlsrv_errors(), true));
+            }
+            
+            sqlsrv_commit($conn);
+            
+        } catch (Exception $e) {
+            sqlsrv_rollback($conn);
+            error_log("Error eliminando Servidor: " . $e->getMessage());
+            die("❌ Error eliminando Servidor: " . $e->getMessage());
         }
+        
     } else {
         die("❌ Acción no válida o faltan datos.");
     }
 
     header("Location: ../views/crud_servidor.php?success=1");
     exit;
+}
+
+// Función para crear slots de un activo
+function crearSlots($id_activo, $tipo_activo, $slots_cpu, $slots_ram, $slots_almacenamiento, $slots_tarjeta_video, $conn) {
+    $tipos_slots = [
+        'PROCESADOR' => $slots_cpu,
+        'RAM' => $slots_ram,
+        'ALMACENAMIENTO' => $slots_almacenamiento,
+        'TARJETA_VIDEO' => $slots_tarjeta_video
+    ];
+    
+    foreach ($tipos_slots as $tipo_slot => $cantidad) {
+        if ($cantidad > 0) {
+            for ($i = 0; $i < $cantidad; $i++) {
+                $sql_slot = "INSERT INTO slot_activo (id_activo, tipo_activo, tipo_slot, estado) VALUES (?, ?, ?, 'disponible')";
+                $stmt = sqlsrv_query($conn, $sql_slot, [$id_activo, $tipo_activo, $tipo_slot]);
+                
+                if ($stmt === false) {
+                    throw new Exception("Error creando slot $tipo_slot para Servidor: " . print_r(sqlsrv_errors(), true));
+                }
+            }
+            error_log("Creados $cantidad slots de $tipo_slot para Servidor ID: $id_activo");
+        } else {
+            error_log("No se crearon slots de $tipo_slot para Servidor ID: $id_activo (cantidad = 0)");
+        }
+    }
+}
+
+// Función para asignar componente a slot
+function asignarComponenteASlot($id_activo, $tipo_slot, $componente_data, $conn) {
+    list($tipo_componente, $componente_id) = explode('_', $componente_data);
+    
+    // Buscar slot disponible
+    $sql_slot = "SELECT TOP 1 id_slot FROM slot_activo 
+                 WHERE id_activo = ? AND tipo_slot = ? AND estado = 'disponible' 
+                 ORDER BY id_slot";
+    $stmt = sqlsrv_query($conn, $sql_slot, [$id_activo, $tipo_slot]);
+    
+    if (!$stmt || !($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC))) {
+        throw new Exception("No hay slots disponibles para $tipo_slot en Servidor");
+    }
+    
+    $id_slot = $row['id_slot'];
+    
+    $tabla_slot = '';
+    $campo_componente = '';
+    
+    switch ($tipo_slot) {
+        case 'PROCESADOR':
+            $tabla_slot = 'slot_activo_procesador';
+            if ($tipo_componente == 'generico') {
+                $campo_componente = 'id_procesador_generico';
+            } else {
+                $campo_componente = 'id_procesador';
+            }
+            break;
+        case 'RAM':
+            $tabla_slot = 'slot_activo_ram';
+            if ($tipo_componente == 'generico') {
+                $campo_componente = 'id_ram_generico';
+            } else {
+                $campo_componente = 'id_ram';
+            }
+            break;
+        case 'ALMACENAMIENTO':
+            $tabla_slot = 'slot_activo_almacenamiento';
+            if ($tipo_componente == 'generico') {
+                $campo_componente = 'id_almacenamiento_generico';
+            } else {
+                $campo_componente = 'id_almacenamiento';
+            }
+            break;
+        case 'TARJETA_VIDEO':
+            $tabla_slot = 'slot_activo_tarjeta_video';
+            if ($tipo_componente == 'generico') {
+                $campo_componente = 'id_tarjeta_video_generico';
+            } else {
+                $campo_componente = 'id_tarjeta_video';
+            }
+            break;
+    }
+    
+    // Insertar en tabla específica
+    $sql_insertar = "INSERT INTO $tabla_slot (id_slot, $campo_componente) VALUES (?, ?)";
+    $stmt_insertar = sqlsrv_query($conn, $sql_insertar, [$id_slot, $componente_id]);
+    
+    if ($stmt_insertar === false) {
+        throw new Exception("Error asignando componente Servidor a slot: " . print_r(sqlsrv_errors(), true));
+    }
+    
+    // Marcar slot como ocupado
+    $sql_ocupar = "UPDATE slot_activo SET estado = 'ocupado' WHERE id_slot = ?";
+    sqlsrv_query($conn, $sql_ocupar, [$id_slot]);
 }
 ?>

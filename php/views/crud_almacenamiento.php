@@ -20,7 +20,7 @@ $marcasAlmacenamiento = sqlsrv_query($conn, $sqlMarcasAlmacenamiento);
 <html>
     <head>
         <title>Gestión de Almacenamiento</title>
-        <link rel="stylesheet" href="../../css/admin/crud_admin.css">
+        <link rel="stylesheet" href="../../css/admin/admin_main.css">
     </head> 
     <body>
         <header>

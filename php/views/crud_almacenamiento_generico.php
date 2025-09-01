@@ -11,7 +11,7 @@ $almacenamientos = sqlsrv_query($conn, $sqlAlmacenamientos);
 <html>
     <head>
         <title>Gestión de Almacenamiento Genérico</title>
-        <link rel="stylesheet" href="../../css/admin/crud_admin.css">
+        <link rel="stylesheet" href="../../css/admin/admin_main.css">
     </head> 
     <body>
         <header>

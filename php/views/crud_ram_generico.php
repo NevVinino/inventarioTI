@@ -11,7 +11,7 @@ $rams = sqlsrv_query($conn, $sqlRAMs);
 <html>
     <head>
         <title>Gestión de RAM Genérico</title>
-        <link rel="stylesheet" href="../../css/admin/crud_admin.css">
+        <link rel="stylesheet" href="../../css/admin/admin_main.css">
     </head> 
     <body>
         <header>

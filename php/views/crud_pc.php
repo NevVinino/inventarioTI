@@ -94,12 +94,12 @@ SELECT DISTINCT
     e.nombre AS empresa,
     e.id_empresa,
     q.ruta_qr,
-    -- Información de slots de CPU
+    -- Información de slots de CPU (incluye genéricos)
     (
         SELECT STRING_AGG(
             CASE 
-                WHEN sap.id_procesador IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', pr.modelo + ' ' + ISNULL(pr.generacion, ''))
-                WHEN sap.id_procesador_generico IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', pg.modelo + ' ' + ISNULL(pg.generacion, ''))
+                WHEN sap.id_procesador IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', ISNULL(mp.nombre + ' ', '') + pr.modelo + ISNULL(' ' + pr.generacion, ''))
+                WHEN sap.id_procesador_generico IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', pg.modelo + ISNULL(' ' + pg.generacion, ''))
                 ELSE CONCAT('Slot ', sa.id_slot, ': Libre')
             END, 
             ', '
@@ -107,14 +107,15 @@ SELECT DISTINCT
         FROM slot_activo sa 
         LEFT JOIN slot_activo_procesador sap ON sa.id_slot = sap.id_slot
         LEFT JOIN procesador pr ON sap.id_procesador = pr.id_procesador
+        LEFT JOIN marca mp ON pr.id_marca = mp.id_marca
         LEFT JOIN procesador_generico pg ON sap.id_procesador_generico = pg.id_procesador_generico
         WHERE sa.id_activo = a.id_activo AND sa.tipo_slot = 'PROCESADOR'
     ) as slots_cpu_texto,
-    -- Información de slots de RAM
+    -- Información de slots de RAM (incluye genéricos)
     (
         SELECT STRING_AGG(
             CASE 
-                WHEN sar.id_ram IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', r.capacidad + ' ' + ISNULL(r.tipo, ''))
+                WHEN sar.id_ram IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', r.capacidad + ISNULL(' ' + r.tipo, '') + ISNULL(' ' + mr.nombre, ''))
                 WHEN sar.id_ram_generico IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', rg.capacidad)
                 ELSE CONCAT('Slot ', sa.id_slot, ': Libre')
             END, 
@@ -123,15 +124,16 @@ SELECT DISTINCT
         FROM slot_activo sa 
         LEFT JOIN slot_activo_ram sar ON sa.id_slot = sar.id_slot
         LEFT JOIN RAM r ON sar.id_ram = r.id_ram
+        LEFT JOIN marca mr ON r.id_marca = mr.id_marca
         LEFT JOIN RAM_generico rg ON sar.id_ram_generico = rg.id_ram_generico
         WHERE sa.id_activo = a.id_activo AND sa.tipo_slot = 'RAM'
     ) as slots_ram_texto,
-    -- Información de slots de almacenamiento
+    -- Información de slots de almacenamiento (incluye genéricos)
     (
         SELECT STRING_AGG(
             CASE 
-                WHEN saa.id_almacenamiento IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', s.capacidad + ' ' + ISNULL(s.tipo, ''))
-                WHEN saa.id_almacenamiento_generico IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', sg.capacidad + ' ' + ISNULL(sg.tipo, ''))
+                WHEN saa.id_almacenamiento IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', s.capacidad + ISNULL(' ' + s.tipo, '') + ISNULL(' ' + ms.nombre, ''))
+                WHEN saa.id_almacenamiento_generico IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', sg.capacidad + ISNULL(' ' + sg.tipo, ''))
                 ELSE CONCAT('Slot ', sa.id_slot, ': Libre')
             END, 
             ', '
@@ -139,15 +141,16 @@ SELECT DISTINCT
         FROM slot_activo sa 
         LEFT JOIN slot_activo_almacenamiento saa ON sa.id_slot = saa.id_slot
         LEFT JOIN almacenamiento s ON saa.id_almacenamiento = s.id_almacenamiento
+        LEFT JOIN marca ms ON s.id_marca = ms.id_marca
         LEFT JOIN almacenamiento_generico sg ON saa.id_almacenamiento_generico = sg.id_almacenamiento_generico
         WHERE sa.id_activo = a.id_activo AND sa.tipo_slot = 'ALMACENAMIENTO'
     ) as slots_almacenamiento_texto,
-    -- Información de slots de tarjeta de video
+    -- Información de slots de tarjeta de video (incluye genéricos)
     (
         SELECT STRING_AGG(
             CASE 
-                WHEN satv.id_tarjeta_video IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', tv.modelo + ' ' + ISNULL(tv.memoria, ''))
-                WHEN satv.id_tarjeta_video_generico IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', tvg.modelo + ' ' + ISNULL(tvg.memoria, ''))
+                WHEN satv.id_tarjeta_video IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', ISNULL(mtv.nombre + ' ', '') + tv.modelo + ISNULL(' ' + tv.memoria, '') + ISNULL(' ' + tv.tipo_memoria, ''))
+                WHEN satv.id_tarjeta_video_generico IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', tvg.modelo + ISNULL(' ' + tvg.memoria, ''))
                 ELSE CONCAT('Slot ', sa.id_slot, ': Libre')
             END, 
             ', '
@@ -155,6 +158,7 @@ SELECT DISTINCT
         FROM slot_activo sa 
         LEFT JOIN slot_activo_tarjeta_video satv ON sa.id_slot = satv.id_slot
         LEFT JOIN tarjeta_video tv ON satv.id_tarjeta_video = tv.id_tarjeta_video
+        LEFT JOIN marca mtv ON tv.id_marca = mtv.id_marca
         LEFT JOIN tarjeta_video_generico tvg ON satv.id_tarjeta_video_generico = tvg.id_tarjeta_video_generico
         WHERE sa.id_activo = a.id_activo AND sa.tipo_slot = 'TARJETA_VIDEO'
     ) as slots_tarjeta_video_texto
@@ -186,7 +190,7 @@ $activos = $filas_temp;
 <head>
     <meta charset="UTF-8">
     <title>Gestión de PCs</title>
-    <link rel="stylesheet" href="../../css/admin/crud_admin.css">
+    <link rel="stylesheet" href="../../css/admin/admin_main.css">
 </head>
 <body>
 
@@ -563,67 +567,131 @@ $activos = $filas_temp;
 <div id="modalVisualizacion" class="modal">
     <div class="modal-content detalles">
         <span class="close close-view">&times;</span>
-        <h3>Detalles de la PC</h3>
+        <h3>Detalles del Activo - PC</h3>
         
         <div class="detalles-grid">
-            <div class="detalle-item">
-                <strong>Nombre del Equipo:</strong>
-                <span id="view-nombreequipo"></span>
+            <!-- Información básica del equipo -->
+            <div class="seccion-detalles">
+                <h4>Información Básica</h4>
+                <div class="detalle-item">
+                    <strong>Nombre del Equipo:</strong>
+                    <span id="view-nombreequipo"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Modelo:</strong>
+                    <span id="view-modelo"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Marca:</strong>
+                    <span id="view-marca"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Número de Serie:</strong>
+                    <span id="view-serial"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Tipo de Activo:</strong>
+                    <span id="view-tipo"></span>
+                </div>
             </div>
-            <div class="detalle-item">
-                <strong>Modelo:</strong>
-                <span id="view-modelo"></span>
+
+            <!-- Información de red -->
+            <div class="seccion-detalles">
+                <h4>Configuración de Red</h4>
+                <div class="detalle-item">
+                    <strong>Dirección MAC:</strong>
+                    <span id="view-mac"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Dirección IP:</strong>
+                    <span id="view-ip"></span>
+                </div>
             </div>
-            <div class="detalle-item">
-                <strong>MAC:</strong>
-                <span id="view-mac"></span>
+
+            <!-- Información administrativa -->
+            <div class="seccion-detalles">
+                <h4>Información Administrativa</h4>
+                <div class="detalle-item">
+                    <strong>Estado:</strong>
+                    <span id="view-estado"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Empresa:</strong>
+                    <span id="view-empresa"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Asistente TI (Registró el activo):</strong>
+                    <span id="view-asistente"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Fecha de Compra:</strong>
+                    <span id="view-fechacompra"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Precio de Compra:</strong>
+                    <span id="view-preciocompra"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Orden de Compra:</strong>
+                    <span id="view-ordencompra"></span>
+                </div>
             </div>
-            <div class="detalle-item">
-                <strong>Serial:</strong>
-                <span id="view-serial"></span>
+
+            <!-- Información de garantía -->
+            <div class="seccion-detalles">
+                <h4>Información de Garantía</h4>
+                <div class="detalle-item">
+                    <strong>Garantía Hasta:</strong>
+                    <span id="view-garantia"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Estado de Garantía:</strong>
+                    <span id="view-estadogarantia"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Antigüedad:</strong>
+                    <span id="view-antiguedad"></span>
+                </div>
             </div>
-            <div class="detalle-item">
-                <strong>IP:</strong>
-                <span id="view-ip"></span>
+
+            <!-- Especificaciones técnicas -->
+            <div class="seccion-detalles">
+                <h4>Especificaciones Técnicas</h4>
+                <div class="detalle-item">
+                    <strong>Procesador (CPU):</strong>
+                    <span id="view-cpu"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Memoria RAM:</strong>
+                    <span id="view-ram"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Almacenamiento:</strong>
+                    <span id="view-almacenamiento"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Tarjeta de Video:</strong>
+                    <span id="view-tarjeta_video"></span>
+                </div>
             </div>
-            <div class="detalle-item">
-                <strong>Estado:</strong>
-                <span id="view-estado"></span>
+
+            <!-- Observaciones - MOVIDO PARA ESTAR AL LADO DERECHO -->
+            <div class="seccion-detalles">
+                <h4>Observaciones</h4>
+                <div class="detalle-item observaciones-item">
+                    <div id="view-observaciones" class="observaciones-texto"></div>
+                </div>
             </div>
-            <div class="detalle-item">
-                <strong>Tipo:</strong>
-                <span id="view-tipo"></span>
-            </div>
-            <div class="detalle-item">
-                <strong>Marca:</strong>
-                <span id="view-marca"></span>
-            </div>
-            <div class="detalle-item">
-                <strong>Asistente TI:</strong>
-                <span id="view-asistente"></span>
-            </div>
-            <div class="detalle-item">
-                <strong>Procesador:</strong>
-                <span id="view-cpu"></span>
-            </div>
-            <div class="detalle-item">
-                <strong>Memoria RAM:</strong>
-                <span id="view-ram"></span>
-            </div>
-            <div class="detalle-item">
-                <strong>Almacenamiento:</strong>
-                <span id="view-almacenamiento"></span>
-            </div>
-            <div class="detalle-item">
-                <strong>Tarjeta de Video:</strong>
-                <span id="view-tarjeta_video"></span>
-            </div>
-            <div class="detalle-item qr-container">
-                <strong>Código QR</strong>
-                <div id="view-qr"></div>
-                <a id="download-qr" href="#" download class="btn-download">
-                    Descargar QR
-                </a>
+
+            <!-- Código QR - ocupar ancho completo -->
+            <div class="seccion-detalles qr-section">
+                <h4>Código QR</h4>
+                <div class="detalle-item qr-container">
+                    <div id="view-qr"></div>
+                    <a id="download-qr" href="#" download class="btn-download">
+                        Descargar QR
+                    </a>
+                </div>
             </div>
         </div>
     </div>

@@ -9,7 +9,7 @@ include("../includes/verificar_acceso.php");
 <head>
     <meta charset="UTF-8">
     <title>Panel del Administrador</title>
-    <link rel="stylesheet" href="../../css/admin/vista_admin.css">
+    <link rel="stylesheet" href="../../css/admin/admin_main.css">
 
     
 </head>

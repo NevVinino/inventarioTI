@@ -10,27 +10,67 @@ define('BASE_URL', 'http://localhost:8000');
 $id_usuario_sesion = $_SESSION['id_usuario'] ?? '';
 $nombre_usuario_sesion = $_SESSION['username'] ?? '';
 
-// Consultas para selects
+// Consultas para selects - MARCAS FILTRADAS PARA SERVIDOR
 $empresas = sqlsrv_query($conn, "SELECT id_empresa, nombre FROM empresa");
-$marcas = sqlsrv_query($conn, "SELECT id_marca, nombre FROM marca");
+
+// Filtrar marcas solo para tipo "Servidor" 
+$sql_marcas = "SELECT m.id_marca, m.nombre 
+               FROM marca m 
+               INNER JOIN tipo_marca tm ON m.id_tipo_marca = tm.id_tipo_marca 
+               WHERE tm.nombre = 'Servidor' OR tm.nombre IS NULL
+               ORDER BY m.nombre";
+$marcas = sqlsrv_query($conn, $sql_marcas);
+
 $estados = sqlsrv_query($conn, "SELECT id_estado_activo, vestado_activo FROM estado_activo");
 
-// Consultas para componentes
-$sql_cpu = "SELECT p.id_cpu, CONCAT(m.nombre, ' ', p.modelo, ' Gen ', p.generacion) as descripcion 
-            FROM procesador p 
-            LEFT JOIN marca m ON p.id_marca = m.id_marca";
-$sql_ram = "SELECT r.id_ram, CONCAT(r.capacidad, ' ', r.tipo, ' ', m.nombre) as descripcion 
-            FROM RAM r 
-            LEFT JOIN marca m ON r.id_marca = m.id_marca";
-$sql_almacenamiento = "SELECT s.id_almacenamiento, CONCAT(s.capacidad, ' ', s.tipo, ' ', m.nombre) as descripcion 
-                FROM almacenamiento s 
-                LEFT JOIN marca m ON s.id_marca = m.id_marca";
+// Agregar consultas para componentes - USANDO MISMO SISTEMA QUE PC/LAPTOPS
+$sql_cpu = "
+    SELECT id_procesador as id, CONCAT(m.nombre, ' ', modelo, ISNULL(' Gen ' + generacion, '')) as descripcion, 'detallado' as tipo
+    FROM procesador p 
+    LEFT JOIN marca m ON p.id_marca = m.id_marca
+    UNION ALL
+    SELECT id_procesador_generico as id, CONCAT(modelo, ISNULL(' Gen ' + generacion, '')) as descripcion, 'generico' as tipo
+    FROM procesador_generico
+    ORDER BY descripcion";
+
+$sql_ram = "
+    SELECT id_ram as id, CONCAT(r.capacidad, ISNULL(' ' + r.tipo, ''), ISNULL(' ' + m.nombre, '')) as descripcion, 'detallado' as tipo
+    FROM RAM r 
+    LEFT JOIN marca m ON r.id_marca = m.id_marca
+    UNION ALL
+    SELECT id_ram_generico as id, capacidad as descripcion, 'generico' as tipo
+    FROM RAM_generico
+    ORDER BY descripcion";
+
+$sql_almacenamiento = "
+    SELECT id_almacenamiento as id, CONCAT(s.capacidad, ISNULL(' ' + s.tipo, ''), ISNULL(' ' + m.nombre, '')) as descripcion, 'detallado' as tipo
+    FROM almacenamiento s 
+    LEFT JOIN marca m ON s.id_marca = m.id_marca
+    UNION ALL
+    SELECT id_almacenamiento_generico as id, CONCAT(capacidad, ISNULL(' ' + tipo, '')) as descripcion, 'generico' as tipo
+    FROM almacenamiento_generico
+    ORDER BY descripcion";
+
+// Consulta para tarjetas de video (servidores pueden tenerlas para workloads específicos)
+$sql_tarjeta_video = "
+    SELECT id_tarjeta_video as id, 
+           CONCAT(m.nombre, ' ', tv.modelo, ISNULL(' ' + tv.memoria, ''), ISNULL(' ' + tv.tipo_memoria, '')) as descripcion, 
+           'detallado' as tipo
+    FROM tarjeta_video tv
+    LEFT JOIN marca m ON tv.id_marca = m.id_marca
+    UNION ALL
+    SELECT id_tarjeta_video_generico as id, 
+           CONCAT(modelo, ISNULL(' ' + memoria, '')) as descripcion, 
+           'generico' as tipo
+    FROM tarjeta_video_generico
+    ORDER BY descripcion";
 
 $cpus = sqlsrv_query($conn, $sql_cpu);
 $rams = sqlsrv_query($conn, $sql_ram);
 $almacenamientos = sqlsrv_query($conn, $sql_almacenamiento);
+$tarjetas_video = sqlsrv_query($conn, $sql_tarjeta_video);
 
-// Consulta principal para Servidores
+// Consulta principal actualizada para usar slots - ADAPTADA PARA SERVIDOR
 $sql = "
 SELECT DISTINCT
     a.id_activo,
@@ -54,42 +94,74 @@ SELECT DISTINCT
     e.nombre AS empresa,
     e.id_empresa,
     q.ruta_qr,
+    -- Información de slots de CPU (incluye genéricos)
     (
-        SELECT STRING_AGG(pr.modelo + ' ' + ISNULL(pr.generacion, ''), ', ')
-        FROM servidor_procesador sp 
-        JOIN procesador pr ON sp.id_cpu = pr.id_cpu 
-        WHERE sp.id_servidor = s.id_servidor
-    ) as cpus_texto,
+        SELECT STRING_AGG(
+            CASE 
+                WHEN sap.id_procesador IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', ISNULL(mp.nombre + ' ', '') + pr.modelo + ISNULL(' ' + pr.generacion, ''))
+                WHEN sap.id_procesador_generico IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', pg.modelo + ISNULL(' ' + pg.generacion, ''))
+                ELSE CONCAT('Slot ', sa.id_slot, ': Libre')
+            END, 
+            ', '
+        )
+        FROM slot_activo sa 
+        LEFT JOIN slot_activo_procesador sap ON sa.id_slot = sap.id_slot
+        LEFT JOIN procesador pr ON sap.id_procesador = pr.id_procesador
+        LEFT JOIN marca mp ON pr.id_marca = mp.id_marca
+        LEFT JOIN procesador_generico pg ON sap.id_procesador_generico = pg.id_procesador_generico
+        WHERE sa.id_activo = a.id_activo AND sa.tipo_slot = 'PROCESADOR'
+    ) as slots_cpu_texto,
+    -- Información de slots de RAM (incluye genéricos)
     (
-        SELECT STRING_AGG(r.capacidad + ' ' + ISNULL(r.tipo, ''), ', ')
-        FROM servidor_ram sr 
-        JOIN RAM r ON sr.id_ram = r.id_ram 
-        WHERE sr.id_servidor = s.id_servidor
-    ) as rams_texto,
+        SELECT STRING_AGG(
+            CASE 
+                WHEN sar.id_ram IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', r.capacidad + ISNULL(' ' + r.tipo, '') + ISNULL(' ' + mr.nombre, ''))
+                WHEN sar.id_ram_generico IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', rg.capacidad)
+                ELSE CONCAT('Slot ', sa.id_slot, ': Libre')
+            END, 
+            ', '
+        )
+        FROM slot_activo sa 
+        LEFT JOIN slot_activo_ram sar ON sa.id_slot = sar.id_slot
+        LEFT JOIN RAM r ON sar.id_ram = r.id_ram
+        LEFT JOIN marca mr ON r.id_marca = mr.id_marca
+        LEFT JOIN RAM_generico rg ON sar.id_ram_generico = rg.id_ram_generico
+        WHERE sa.id_activo = a.id_activo AND sa.tipo_slot = 'RAM'
+    ) as slots_ram_texto,
+    -- Información de slots de almacenamiento (incluye genéricos)
     (
-        SELECT STRING_AGG(st.capacidad + ' ' + ISNULL(st.tipo, ''), ', ')
-        FROM servidor_almacenamiento sa 
-        JOIN almacenamiento st ON sa.id_almacenamiento = st.id_almacenamiento 
-        WHERE sa.id_servidor = s.id_servidor
-    ) as almacenamientos_texto,
+        SELECT STRING_AGG(
+            CASE 
+                WHEN saa.id_almacenamiento IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', st.capacidad + ISNULL(' ' + st.tipo, '') + ISNULL(' ' + ms.nombre, ''))
+                WHEN saa.id_almacenamiento_generico IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', sg.capacidad + ISNULL(' ' + sg.tipo, ''))
+                ELSE CONCAT('Slot ', sa.id_slot, ': Libre')
+            END, 
+            ', '
+        )
+        FROM slot_activo sa 
+        LEFT JOIN slot_activo_almacenamiento saa ON sa.id_slot = saa.id_slot
+        LEFT JOIN almacenamiento st ON saa.id_almacenamiento = st.id_almacenamiento
+        LEFT JOIN marca ms ON st.id_marca = ms.id_marca
+        LEFT JOIN almacenamiento_generico sg ON saa.id_almacenamiento_generico = sg.id_almacenamiento_generico
+        WHERE sa.id_activo = a.id_activo AND sa.tipo_slot = 'ALMACENAMIENTO'
+    ) as slots_almacenamiento_texto,
+    -- Información de slots de tarjeta de video (incluye genéricos)
     (
-        SELECT STRING_AGG(CONCAT(pr.id_cpu, '::', pr.modelo + ' ' + ISNULL(pr.generacion, '')), '||')
-        FROM servidor_procesador sp 
-        JOIN procesador pr ON sp.id_cpu = pr.id_cpu 
-        WHERE sp.id_servidor = s.id_servidor
-    ) as cpus_data,
-    (
-        SELECT STRING_AGG(CONCAT(r.id_ram, '::', r.capacidad + ' ' + ISNULL(r.tipo, '')), '||')
-        FROM servidor_ram sr 
-        JOIN RAM r ON sr.id_ram = r.id_ram 
-        WHERE sr.id_servidor = s.id_servidor
-    ) as rams_data,
-    (
-        SELECT STRING_AGG(CONCAT(st.id_almacenamiento, '::', st.capacidad + ' ' + ISNULL(st.tipo, '')), '||')
-        FROM servidor_almacenamiento sa 
-        JOIN almacenamiento st ON sa.id_almacenamiento = st.id_almacenamiento 
-        WHERE sa.id_servidor = s.id_servidor
-    ) as almacenamientos_data
+        SELECT STRING_AGG(
+            CASE 
+                WHEN satv.id_tarjeta_video IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', ISNULL(mtv.nombre + ' ', '') + tv.modelo + ISNULL(' ' + tv.memoria, '') + ISNULL(' ' + tv.tipo_memoria, ''))
+                WHEN satv.id_tarjeta_video_generico IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', tvg.modelo + ISNULL(' ' + tvg.memoria, ''))
+                ELSE CONCAT('Slot ', sa.id_slot, ': Libre')
+            END, 
+            ', '
+        )
+        FROM slot_activo sa 
+        LEFT JOIN slot_activo_tarjeta_video satv ON sa.id_slot = satv.id_slot
+        LEFT JOIN tarjeta_video tv ON satv.id_tarjeta_video = tv.id_tarjeta_video
+        LEFT JOIN marca mtv ON tv.id_marca = mtv.id_marca
+        LEFT JOIN tarjeta_video_generico tvg ON satv.id_tarjeta_video_generico = tvg.id_tarjeta_video_generico
+        WHERE sa.id_activo = a.id_activo AND sa.tipo_slot = 'TARJETA_VIDEO'
+    ) as slots_tarjeta_video_texto
 FROM activo a
 INNER JOIN servidor s ON a.id_servidor = s.id_servidor
 LEFT JOIN marca m ON s.id_marca = m.id_marca
@@ -118,7 +190,7 @@ $activos = $filas_temp;
 <head>
     <meta charset="UTF-8">
     <title>Gestión de Servidores</title>
-    <link rel="stylesheet" href="../../css/admin/crud_admin.css">
+    <link rel="stylesheet" href="../../css/admin/admin_main.css">
 </head>
 <body>
 
@@ -194,12 +266,16 @@ $activos = $filas_temp;
                 if (isset($a['fechaCompra']) && $a['fechaCompra'] !== null) {
                     if ($a['fechaCompra'] instanceof DateTime) {
                         $fecha_compra = $a['fechaCompra']->format('Y-m-d');
+                    } elseif (is_array($a['fechaCompra']) && isset($a['fechaCompra']['date'])) {
+                        $fecha_compra = date('Y-m-d', strtotime($a['fechaCompra']['date']));
                     }
                 }
                 
                 if (isset($a['garantia']) && $a['garantia'] !== null) {
                     if ($a['garantia'] instanceof DateTime) {
                         $fecha_garantia = $a['garantia']->format('Y-m-d');
+                    } elseif (is_array($a['garantia']) && isset($a['garantia']['date'])) {
+                        $fecha_garantia = date('Y-m-d', strtotime($a['garantia']['date']));
                     }
                 }
             ?>
@@ -246,10 +322,19 @@ $activos = $filas_temp;
                             data-estado="<?= htmlspecialchars($a['estado'] ?? '') ?>"
                             data-tipo="Servidor"
                             data-marca="<?= htmlspecialchars($a['marca'] ?? '') ?>"
-                            data-asistente="<?= htmlspecialchars($a['empresa'] ?? 'No asignado') ?>"
-                            data-cpu="<?= htmlspecialchars($a['cpus_texto'] ?? 'No especificado') ?>"
-                            data-ram="<?= htmlspecialchars($a['rams_texto'] ?? 'No especificado') ?>"
-                            data-almacenamiento="<?= htmlspecialchars($a['almacenamientos_texto'] ?? 'No especificado') ?>"
+                            data-empresa="<?= htmlspecialchars($a['empresa'] ?? 'No asignado') ?>"
+                            data-asistente="<?= htmlspecialchars($nombre_usuario_sesion) ?>"
+                            data-fechacompra="<?= htmlspecialchars($fecha_compra) ?>"
+                            data-garantia="<?= htmlspecialchars($fecha_garantia) ?>"
+                            data-preciocompra="<?= htmlspecialchars($a['precioCompra'] ?? '') ?>"
+                            data-antiguedad="<?= htmlspecialchars($a['antiguedad'] ?? '') ?>"
+                            data-ordencompra="<?= htmlspecialchars($a['ordenCompra'] ?? '') ?>"
+                            data-estadogarantia="<?= htmlspecialchars($a['estadoGarantia'] ?? '') ?>"
+                            data-observaciones="<?= htmlspecialchars($a['observaciones'] ?? '') ?>"
+                            data-cpu="<?= htmlspecialchars($a['slots_cpu_texto'] ?? 'No especificado') ?>"
+                            data-ram="<?= htmlspecialchars($a['slots_ram_texto'] ?? 'No especificado') ?>"
+                            data-almacenamiento="<?= htmlspecialchars($a['slots_almacenamiento_texto'] ?? 'No especificado') ?>"
+                            data-tarjeta_video="<?= htmlspecialchars($a['slots_tarjeta_video_texto'] ?? 'No especificado') ?>"
                             <?php if(isset($a['ruta_qr']) && !empty($a['ruta_qr'])): ?>
                             data-qr="<?= htmlspecialchars($a['ruta_qr']) ?>"
                             <?php endif; ?>
@@ -275,9 +360,6 @@ $activos = $filas_temp;
                             data-marca="<?= htmlspecialchars($a['id_marca'] ?? '') ?>"
                             data-estadoactivo="<?= htmlspecialchars($a['id_estado_activo'] ?? '') ?>"
                             data-empresa="<?= htmlspecialchars($a['id_empresa'] ?? '') ?>"
-                            data-cpus="<?= htmlspecialchars($a['cpus_data'] ?? '') ?>"
-                            data-rams="<?= htmlspecialchars($a['rams_data'] ?? '') ?>"
-                            data-almacenamientos="<?= htmlspecialchars($a['almacenamientos_data'] ?? '') ?>"
                         >
                             <img src="../../img/editar.png" alt="Editar">
                         </button>
@@ -384,51 +466,104 @@ $activos = $filas_temp;
             ?>
 
             <div class="componentes-section">
-                <h4>Componentes</h4>
+                <h4>Configuración de Slots para Servidor</h4>
                 
-                <div class="componente-grupo">
-                    <label>Procesadores:</label>
-                    <select id="selectCPU" class="componente-select">
+                <!-- Toggle para filtrar tipos de componentes -->
+                <div class="filtro-componentes">
+                    <label>Filtrar componentes:</label>
+                    <button type="button" id="toggleTipoComponente" class="btn-toggle-tipo" data-tipo="todos">
+                        Mostrar Todos
+                    </button>
+                    <span id="estadoFiltro" class="estado-filtro">(Genéricos y Detallados)</span>
+                </div>
+                
+                <div class="slots-config">
+                    <label>Cantidad de slots de CPU (Servidores soportan múltiples CPUs):</label>
+                    <input type="number" name="slots_cpu" id="slots_cpu" min="1" max="4" value="2" required>
+                    
+                    <label>Cantidad de slots de RAM (Servidores tienen muchos slots):</label>
+                    <input type="number" name="slots_ram" id="slots_ram" min="2" max="24" value="8" required>
+                    
+                    <label>Cantidad de slots de Almacenamiento:</label>
+                    <input type="number" name="slots_almacenamiento" id="slots_almacenamiento" min="2" max="12" value="4" required>
+                    
+                    <label>Cantidad de slots de Tarjeta de Video (opcional):</label>
+                    <input type="number" name="slots_tarjeta_video" id="slots_tarjeta_video" min="0" max="8" value="0">
+                </div>
+
+                <div id="slots-container" style="display: none;">
+                    <h5>Asignar Componentes a Slots</h5>
+                    <div id="slots-cpu-container"></div>
+                    <div id="slots-ram-container"></div>
+                    <div id="slots-almacenamiento-container"></div>
+                    <div id="slots-tarjeta_video-container"></div>
+                </div>
+                
+                <!-- Componentes disponibles para los slots -->
+                <div style="display: none;">
+                    <select id="source-cpu" data-tipo-actual="todos">
                         <option value="">Seleccione un procesador...</option>
-                        <?php while ($cpu = sqlsrv_fetch_array($cpus, SQLSRV_FETCH_ASSOC)): ?>
-                            <option value="<?= $cpu['id_cpu'] ?>"><?= htmlspecialchars($cpu['descripcion']) ?></option>
-                        <?php endwhile; ?>
-                    </select>
-                    <button type="button" onclick="agregarComponente('CPU')">Agregar</button>
-                    <div id="cpuSeleccionados" class="componentes-seleccionados"></div>
-                </div>
-
-                <div class="componente-grupo">
-                    <label>Memorias RAM:</label>
-                    <select id="selectRAM" class="componente-select">
-                        <option value="">Seleccione memoria RAM...</option>
-                        <?php while ($ram = sqlsrv_fetch_array($rams, SQLSRV_FETCH_ASSOC)): ?>
-                            <option value="<?= $ram['id_ram'] ?>"><?= htmlspecialchars($ram['descripcion']) ?></option>
-                        <?php endwhile; ?>
-                    </select>
-                    <button type="button" onclick="agregarComponente('RAM')">Agregar</button>
-                    <div id="ramSeleccionados" class="componentes-seleccionados"></div>
-                </div>
-
-                <div class="componente-grupo">
-                    <label>Almacenamiento:</label>
-                    <select id="selectAlmacenamiento" class="componente-select">
-                        <option value="">Seleccione almacenamiento...</option>
-                        <?php while ($almacenamiento = sqlsrv_fetch_array($almacenamientos, SQLSRV_FETCH_ASSOC)): ?>
-                            <option value="<?= $almacenamiento['id_almacenamiento'] ?>">
-                                <?= htmlspecialchars($almacenamiento['descripcion']) ?>
+                        <?php 
+                        $cpus = sqlsrv_query($conn, $sql_cpu);
+                        while ($cpu = sqlsrv_fetch_array($cpus, SQLSRV_FETCH_ASSOC)): 
+                        ?>
+                            <option value="<?= $cpu['tipo'] ?>_<?= $cpu['id'] ?>" 
+                                    data-tipo="<?= $cpu['tipo'] ?>"
+                                    data-descripcion="<?= htmlspecialchars($cpu['descripcion']) ?>">
+                                <?= htmlspecialchars($cpu['descripcion']) ?>
+                                <?= $cpu['tipo'] == 'generico' ? ' (Genérico)' : ' (Detallado)' ?>
                             </option>
                         <?php endwhile; ?>
                     </select>
-                    <button type="button" onclick="agregarComponente('Almacenamiento')">Agregar</button>
-                    <div id="almacenamientoSeleccionados" class="componentes-seleccionados"></div>
+                    
+                    <select id="source-ram" data-tipo-actual="todos">
+                        <option value="">Seleccione memoria RAM...</option>
+                        <?php 
+                        $rams = sqlsrv_query($conn, $sql_ram);
+                        while ($ram = sqlsrv_fetch_array($rams, SQLSRV_FETCH_ASSOC)): 
+                        ?>
+                            <option value="<?= $ram['tipo'] ?>_<?= $ram['id'] ?>" 
+                                    data-tipo="<?= $ram['tipo'] ?>"
+                                    data-descripcion="<?= htmlspecialchars($ram['descripcion']) ?>">
+                                <?= htmlspecialchars($ram['descripcion']) ?>
+                                <?= $ram['tipo'] == 'generico' ? ' (Genérico)' : ' (Detallado)' ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
+                    
+                    <select id="source-almacenamiento" data-tipo-actual="todos">
+                        <option value="">Seleccione almacenamiento...</option>
+                        <?php 
+                        $almacenamientos = sqlsrv_query($conn, $sql_almacenamiento);
+                        while ($almacenamiento = sqlsrv_fetch_array($almacenamientos, SQLSRV_FETCH_ASSOC)): 
+                        ?>
+                            <option value="<?= $almacenamiento['tipo'] ?>_<?= $almacenamiento['id'] ?>" 
+                                    data-tipo="<?= $almacenamiento['tipo'] ?>"
+                                    data-descripcion="<?= htmlspecialchars($almacenamiento['descripcion']) ?>">
+                                <?= htmlspecialchars($almacenamiento['descripcion']) ?>
+                                <?= $almacenamiento['tipo'] == 'generico' ? ' (Genérico)' : ' (Detallado)' ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
+                    
+                    <select id="source-tarjeta_video" data-tipo-actual="todos">
+                        <option value="">Seleccione tarjeta de video...</option>
+                        <?php 
+                        while ($tarjeta = sqlsrv_fetch_array($tarjetas_video, SQLSRV_FETCH_ASSOC)): 
+                        ?>
+                            <option value="<?= $tarjeta['tipo'] ?>_<?= $tarjeta['id'] ?>" 
+                                    data-tipo="<?= $tarjeta['tipo'] ?>"
+                                    data-descripcion="<?= htmlspecialchars($tarjeta['descripcion']) ?>">
+                                <?= htmlspecialchars($tarjeta['descripcion']) ?>
+                                <?= $tarjeta['tipo'] == 'generico' ? ' (Genérico)' : ' (Detallado)' ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
                 </div>
             </div>
 
-            <!-- Inputs ocultos para enviar los componentes seleccionados -->
-            <input type="hidden" name="cpus" id="cpusHidden">
-            <input type="hidden" name="rams" id="ramsHidden">
-            <input type="hidden" name="almacenamientos" id="almacenamientosHidden">
+            <!-- Hidden input para datos de slots -->
+            <input type="hidden" name="slots_data" id="slotsDataHidden">
 
             <br>
             <button type="submit">Guardar</button>
@@ -440,63 +575,131 @@ $activos = $filas_temp;
 <div id="modalVisualizacion" class="modal">
     <div class="modal-content detalles">
         <span class="close close-view">&times;</span>
-        <h3>Detalles del Servidor</h3>
+        <h3>Detalles del Activo - Servidor</h3>
         
         <div class="detalles-grid">
-            <div class="detalle-item">
-                <strong>Nombre del Equipo:</strong>
-                <span id="view-nombreequipo"></span>
+            <!-- Información básica del equipo -->
+            <div class="seccion-detalles">
+                <h4>Información Básica</h4>
+                <div class="detalle-item">
+                    <strong>Nombre del Equipo:</strong>
+                    <span id="view-nombreequipo"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Modelo:</strong>
+                    <span id="view-modelo"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Marca:</strong>
+                    <span id="view-marca"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Número de Serie:</strong>
+                    <span id="view-serial"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Tipo de Activo:</strong>
+                    <span id="view-tipo"></span>
+                </div>
             </div>
-            <div class="detalle-item">
-                <strong>Modelo:</strong>
-                <span id="view-modelo"></span>
+
+            <!-- Información de red -->
+            <div class="seccion-detalles">
+                <h4>Configuración de Red</h4>
+                <div class="detalle-item">
+                    <strong>Dirección MAC:</strong>
+                    <span id="view-mac"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Dirección IP:</strong>
+                    <span id="view-ip"></span>
+                </div>
             </div>
-            <div class="detalle-item">
-                <strong>MAC:</strong>
-                <span id="view-mac"></span>
+
+            <!-- Información administrativa -->
+            <div class="seccion-detalles">
+                <h4>Información Administrativa</h4>
+                <div class="detalle-item">
+                    <strong>Estado:</strong>
+                    <span id="view-estado"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Empresa:</strong>
+                    <span id="view-empresa"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Asistente TI (Registró el activo):</strong>
+                    <span id="view-asistente"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Fecha de Compra:</strong>
+                    <span id="view-fechacompra"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Precio de Compra:</strong>
+                    <span id="view-preciocompra"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Orden de Compra:</strong>
+                    <span id="view-ordencompra"></span>
+                </div>
             </div>
-            <div class="detalle-item">
-                <strong>Serial:</strong>
-                <span id="view-serial"></span>
+
+            <!-- Información de garantía -->
+            <div class="seccion-detalles">
+                <h4>Información de Garantía</h4>
+                <div class="detalle-item">
+                    <strong>Garantía Hasta:</strong>
+                    <span id="view-garantia"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Estado de Garantía:</strong>
+                    <span id="view-estadogarantia"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Antigüedad:</strong>
+                    <span id="view-antiguedad"></span>
+                </div>
             </div>
-            <div class="detalle-item">
-                <strong>IP:</strong>
-                <span id="view-ip"></span>
+
+            <!-- Especificaciones técnicas -->
+            <div class="seccion-detalles">
+                <h4>Especificaciones Técnicas</h4>
+                <div class="detalle-item">
+                    <strong>Procesador(es) (CPU):</strong>
+                    <span id="view-cpu"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Memoria RAM:</strong>
+                    <span id="view-ram"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Almacenamiento:</strong>
+                    <span id="view-almacenamiento"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Tarjeta de Video:</strong>
+                    <span id="view-tarjeta_video"></span>
+                </div>
             </div>
-            <div class="detalle-item">
-                <strong>Estado:</strong>
-                <span id="view-estado"></span>
+
+            <!-- Observaciones -->
+            <div class="seccion-detalles">
+                <h4>Observaciones</h4>
+                <div class="detalle-item observaciones-item">
+                    <div id="view-observaciones" class="observaciones-texto"></div>
+                </div>
             </div>
-            <div class="detalle-item">
-                <strong>Tipo:</strong>
-                <span id="view-tipo"></span>
-            </div>
-            <div class="detalle-item">
-                <strong>Marca:</strong>
-                <span id="view-marca"></span>
-            </div>
-            <div class="detalle-item">
-                <strong>Asistente TI:</strong>
-                <span id="view-asistente"></span>
-            </div>
-            <div class="detalle-item">
-                <strong>Procesador:</strong>
-                <span id="view-cpu"></span>
-            </div>
-            <div class="detalle-item">
-                <strong>Memoria RAM:</strong>
-                <span id="view-ram"></span>
-            </div>
-            <div class="detalle-item">
-                <strong>Almacenamiento:</strong>
-                <span id="view-almacenamiento"></span>
-            </div>
-            <div class="detalle-item qr-container">
-                <strong>Código QR</strong>
-                <div id="view-qr"></div>
-                <a id="download-qr" href="#" download class="btn-download">
-                    Descargar QR
-                </a>
+
+            <!-- Código QR - ocupar ancho completo -->
+            <div class="seccion-detalles qr-section">
+                <h4>Código QR</h4>
+                <div class="detalle-item qr-container">
+                    <div id="view-qr"></div>
+                    <a id="download-qr" href="#" download class="btn-download">
+                        Descargar QR
+                    </a>
+                </div>
             </div>
         </div>
     </div>

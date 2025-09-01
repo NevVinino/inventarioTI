@@ -84,7 +84,7 @@ $empresas = sqlsrv_query($conn, "SELECT * FROM empresa");
 <head>
     <meta charset="UTF-8">
     <title>Gestión de Personas</title>
-    <link rel="stylesheet" href="../../css/admin/crud_admin.css">
+    <link rel="stylesheet" href="../../css/admin/admin_main.css">
 </head>
 <body>
 <header>
