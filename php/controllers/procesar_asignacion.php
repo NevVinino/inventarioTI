@@ -163,7 +163,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 sqlsrv_begin_transaction($conn);
                 
                 // Actualizar la asignación con fecha de retorno
-                $sql_update = "UPDATE asignacion SET fecha_retorno = ?, observaciones = CASE WHEN observaciones IS NULL OR observaciones = '' THEN ? ELSE observaciones + ' | RETORNO: ' + ? END WHERE id_asignacion = ?";
+                $sql_update = "UPDATE asignacion SET fecha_retorno = ?, observaciones = CASE WHEN observaciones IS NULL OR observaciones = '' THEN ? ELSE observaciones + ' | RETORNO ' + ? END WHERE id_asignacion = ?";
                 $stmt_update = sqlsrv_query($conn, $sql_update, [$fecha_retorno, $observaciones_retorno, $observaciones_retorno, $id_asignacion]);
 
                 if ($stmt_update === false) {

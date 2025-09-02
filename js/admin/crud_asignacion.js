@@ -23,12 +23,12 @@ document.addEventListener("DOMContentLoaded", function () {
             document.getElementById("id_asignacion").value = "";
             document.getElementById("btn-submit").textContent = "Asignar";
             
-            // Reset all asset options availability
+            // Para nuevas asignaciones, deshabilitar activos ya asignados
             const activoSelect = document.getElementById('id_activo');
             if (activoSelect) {
                 for (let i = 0; i < activoSelect.options.length; i++) {
                     const option = activoSelect.options[i];
-                    option.disabled = option.dataset.estado === 'Asignado';
+                    option.disabled = option.dataset.estadoAsignacion === 'Asignado';
                 }
             }
             
@@ -55,13 +55,27 @@ document.addEventListener("DOMContentLoaded", function () {
             
             // Mapeo directo de dataset a elementos del modal
             const mapeoElementos = {
+                // Información de la persona
                 'view-persona': data.persona,
                 'view-email': data.email, 
                 'view-telefono': data.telefono,
+                'view-localidad': data.localidad,
+                'view-area': data.area,
+                'view-empresa': data.empresa,
+                'view-situacion': data.situacion,
+                'view-tipo-persona': data.tipoPersona,
+                'view-jefe': data.jefe,
+                
+                // Información del activo
                 'view-activo': data.activo,
+                'view-tipo-activo': data.tipoActivo,
                 'view-serial': data.serial,
-                'view-fecha-asignacion': data.fechaAsignacion, // camelCase en JavaScript
-                'view-fecha-retorno': data.fechaRetorno,       // camelCase en JavaScript
+                'view-ip': data.ip,
+                'view-mac': data.mac,
+                
+                // Información de la asignación
+                'view-fecha-asignacion': data.fechaAsignacion,
+                'view-fecha-retorno': data.fechaRetorno,
                 'view-estado': data.estado,
                 'view-usuario': data.usuario,
                 'view-observaciones': data.observaciones
@@ -76,13 +90,103 @@ document.addEventListener("DOMContentLoaded", function () {
                     // Manejo especial para campos específicos
                     if (elementId === 'view-fecha-retorno' && (!valor || valor === 'No especificado')) {
                         valor = 'Pendiente';
-                    } else if (elementId === 'view-observaciones' && (!valor || valor === 'No especificado')) {
-                        valor = 'Sin observaciones';
+                    } else if (elementId === 'view-observaciones') {
+                        // Manejo especial para observaciones
+                        const observacionesContainer = document.getElementById('view-observaciones');
+                        if (observacionesContainer) {
+                            if (!valor || valor === 'No especificado' || valor === 'Sin observaciones') {
+                                observacionesContainer.textContent = 'Sin observaciones adicionales';
+                                observacionesContainer.className = 'observaciones-texto sin-contenido';
+                            } else {
+                                observacionesContainer.textContent = valor;
+                                observacionesContainer.className = 'observaciones-texto con-contenido';
+                            }
+                        }
+                        return; // Salir del bucle para este elemento
                     }
                     
                     element.textContent = valor;
                 }
             });
+
+            // Calcular y mostrar duración de la asignación
+            const duracionElement = document.getElementById('view-duracion');
+            if (duracionElement) {
+                const fechaAsignacion = data.fechaAsignacion;
+                const fechaRetorno = data.fechaRetorno;
+                let duracionTexto = 'No calculable';
+
+                if (fechaAsignacion && fechaAsignacion !== 'Sin fecha') {
+                    // Convertir fecha de formato dd/mm/yyyy a Date
+                    const partesAsignacion = fechaAsignacion.split('/');
+                    if (partesAsignacion.length === 3) {
+                        const fechaInicio = new Date(partesAsignacion[2], partesAsignacion[1] - 1, partesAsignacion[0]);
+                        let fechaFin;
+
+                        if (fechaRetorno && fechaRetorno !== 'Pendiente' && fechaRetorno !== 'Sin fecha') {
+                            // Si hay fecha de retorno, usar esa fecha
+                            const partesRetorno = fechaRetorno.split('/');
+                            if (partesRetorno.length === 3) {
+                                fechaFin = new Date(partesRetorno[2], partesRetorno[1] - 1, partesRetorno[0]);
+                            }
+                        } else {
+                            // Si no hay fecha de retorno, usar fecha actual
+                            fechaFin = new Date();
+                        }
+
+                        if (fechaFin) {
+                            const diferenciaTiempo = fechaFin.getTime() - fechaInicio.getTime();
+                            const dias = Math.floor(diferenciaTiempo / (1000 * 3600 * 24));
+                            
+                            if (dias < 0) {
+                                duracionTexto = 'Fecha inválida';
+                            } else if (dias === 0) {
+                                duracionTexto = 'Mismo día';
+                            } else if (dias === 1) {
+                                duracionTexto = '1 día';
+                            } else if (dias < 30) {
+                                duracionTexto = `${dias} días`;
+                            } else if (dias < 365) {
+                                const meses = Math.floor(dias / 30);
+                                const diasRestantes = dias % 30;
+                                if (diasRestantes === 0) {
+                                    duracionTexto = `${meses} ${meses === 1 ? 'mes' : 'meses'}`;
+                                } else {
+                                    duracionTexto = `${meses} ${meses === 1 ? 'mes' : 'meses'} y ${diasRestantes} ${diasRestantes === 1 ? 'día' : 'días'}`;
+                                }
+                            } else {
+                                const años = Math.floor(dias / 365);
+                                const diasRestantes = dias % 365;
+                                if (diasRestantes === 0) {
+                                    duracionTexto = `${años} ${años === 1 ? 'año' : 'años'}`;
+                                } else {
+                                    duracionTexto = `${años} ${años === 1 ? 'año' : 'años'} y ${diasRestantes} ${diasRestantes === 1 ? 'día' : 'días'}`;
+                                }
+                            }
+
+                            // Agregar estado si está pendiente
+                            if (!fechaRetorno || fechaRetorno === 'Pendiente') {
+                                duracionTexto += ' (en curso)';
+                            }
+                        }
+                    }
+                }
+
+                duracionElement.textContent = duracionTexto;
+            }
+
+            // Aplicar colores según el estado
+            const estadoElement = document.getElementById('view-estado');
+            if (estadoElement && data.estado) {
+                estadoElement.className = ''; // Limpiar clases previas
+                if (data.estado === 'Activo') {
+                    estadoElement.style.color = '#f39c12';
+                    estadoElement.style.fontWeight = 'bold';
+                } else if (data.estado === 'Retornado') {
+                    estadoElement.style.color = '#27ae60';
+                    estadoElement.style.fontWeight = 'bold';
+                }
+            }
 
             modalView.style.display = 'block';
         });
@@ -127,20 +231,53 @@ document.addEventListener("DOMContentLoaded", function () {
             document.getElementById("id_asignacion").value = this.dataset.id;
             document.getElementById("btn-submit").textContent = "Actualizar";
 
-            // Llenar formulario con datos existentes
-            document.getElementById("id_persona").value = this.dataset.idPersona;
-            document.getElementById("id_activo").value = this.dataset.idActivo;
-            document.getElementById("fecha_asignacion").value = this.dataset.fechaAsignacion;
-            document.getElementById("observaciones").value = this.dataset.observaciones;
+            // Debug completo de los datos
+            console.log("=== DEBUG EDITAR ASIGNACIÓN ===");
+            console.log("Dataset completo:", this.dataset);
+            console.log("ID Persona:", this.dataset.idPersona);
+            console.log("ID Activo:", this.dataset.idActivo);
+            console.log("Fecha Asignación:", this.dataset.fechaAsignacion);
+            console.log("Observaciones:", this.dataset.observaciones);
 
-            // Habilitar todos los activos para edición
-            const activoSelect = document.getElementById('id_activo');
-            if (activoSelect) {
-                for (let i = 0; i < activoSelect.options.length; i++) {
-                    activoSelect.options[i].disabled = false;
-                }
+            // Llenar formulario con datos existentes
+            const personaSelect = document.getElementById("id_persona");
+            const activoSelect = document.getElementById("id_activo");
+            const fechaInput = document.getElementById("fecha_asignacion");
+            const observacionesTextarea = document.getElementById("observaciones");
+
+            if (personaSelect) {
+                personaSelect.value = this.dataset.idPersona || '';
+                console.log("Persona seleccionada:", personaSelect.value);
             }
 
+            // Para edición, habilitar todas las opciones primero
+            if (activoSelect) {
+                for (let i = 0; i < activoSelect.options.length; i++) {
+                    const option = activoSelect.options[i];
+                    // Solo deshabilitar activos asignados que NO sean el actual
+                    if (option.dataset.estadoAsignacion === 'Asignado' && option.value !== this.dataset.idActivo) {
+                        option.disabled = true;
+                    } else {
+                        option.disabled = false;
+                    }
+                }
+                
+                // Establecer el valor del activo actual
+                activoSelect.value = this.dataset.idActivo || '';
+                console.log("Activo seleccionado:", activoSelect.value);
+            }
+
+            if (fechaInput) {
+                fechaInput.value = this.dataset.fechaAsignacion || '';
+                console.log("Fecha asignada:", fechaInput.value);
+            }
+
+            if (observacionesTextarea) {
+                observacionesTextarea.value = this.dataset.observaciones || '';
+                console.log("Observaciones:", observacionesTextarea.value);
+            }
+
+            console.log("=== FIN DEBUG ===");
             modalAsignacion.style.display = "block";
         });
     });

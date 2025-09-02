@@ -10,7 +10,7 @@ $nombre_usuario_sesion = $_SESSION['username'] ?? '';
 // Consultas para selects - Removed cedula field since it doesn't exist
 $personas = sqlsrv_query($conn, "SELECT id_persona, CONCAT(nombre, ' ', apellido) as nombre_completo FROM persona ORDER BY nombre, apellido");
 
-// Consulta para activos disponibles (no asignados actualmente)
+// Consulta para activos disponibles (no asignados actualmente) + todos los activos para edición
 $sql_activos = "
 SELECT DISTINCT
     a.id_activo,
@@ -21,20 +21,23 @@ SELECT DISTINCT
     CASE 
         WHEN a.tipo_activo = 'Laptop' THEN ea_l.vestado_activo
         WHEN a.tipo_activo = 'PC' THEN ea_p.vestado_activo
-    END as estado
+    END as estado,
+    CASE 
+        WHEN EXISTS (
+            SELECT 1 FROM asignacion asig 
+            WHERE asig.id_activo = a.id_activo 
+            AND asig.fecha_retorno IS NULL
+        ) THEN 'Asignado'
+        ELSE 'Disponible'
+    END as estado_asignacion
 FROM activo a
 LEFT JOIN laptop l ON a.id_laptop = l.id_laptop
 LEFT JOIN pc p ON a.id_pc = p.id_pc
 LEFT JOIN estado_activo ea_l ON l.id_estado_activo = ea_l.id_estado_activo
 LEFT JOIN estado_activo ea_p ON p.id_estado_activo = ea_p.id_estado_activo
-WHERE NOT EXISTS (
-    SELECT 1 FROM asignacion asig 
-    WHERE asig.id_activo = a.id_activo 
-    AND asig.fecha_retorno IS NULL
-)
-AND (
-    (a.tipo_activo = 'Laptop' AND ea_l.vestado_activo = 'Disponible') OR
-    (a.tipo_activo = 'PC' AND ea_p.vestado_activo = 'Disponible')
+WHERE (
+    (a.tipo_activo = 'Laptop' AND ea_l.vestado_activo IN ('Disponible', 'Asignado')) OR
+    (a.tipo_activo = 'PC' AND ea_p.vestado_activo IN ('Disponible', 'Asignado'))
 )
 ORDER BY descripcion_activo";
 
@@ -52,21 +55,41 @@ SELECT
     CONCAT(p.nombre, ' ', p.apellido) as persona_nombre,
     p.correo as email,
     p.celular as telefono,
+    l.localidad_nombre,
+    a.nombre as area_nombre,
+    e.nombre as empresa_nombre,
+    sp.situacion as situacion_personal,
+    tp.nombre_tipo_persona,
+    CONCAT(jefe.nombre, ' ', jefe.apellido) as jefe_inmediato,
     CASE 
-        WHEN a.tipo_activo = 'Laptop' THEN CONCAT('Laptop - ', l.nombreEquipo, ' (', l.modelo, ')')
-        WHEN a.tipo_activo = 'PC' THEN CONCAT('PC - ', pc.nombreEquipo, ' (', pc.modelo, ')')
+        WHEN act.tipo_activo = 'Laptop' THEN CONCAT('Laptop - ', lap.nombreEquipo, ' (', lap.modelo, ')')
+        WHEN act.tipo_activo = 'PC' THEN CONCAT('PC - ', pc.nombreEquipo, ' (', pc.modelo, ')')
     END as activo_descripcion,
-    a.tipo_activo,
+    act.tipo_activo,
     CASE 
-        WHEN a.tipo_activo = 'Laptop' THEN l.numeroSerial
-        WHEN a.tipo_activo = 'PC' THEN pc.numeroSerial
+        WHEN act.tipo_activo = 'Laptop' THEN lap.numeroSerial
+        WHEN act.tipo_activo = 'PC' THEN pc.numeroSerial
     END as numero_serial,
+    CASE 
+        WHEN act.tipo_activo = 'Laptop' THEN lap.numeroIP
+        WHEN act.tipo_activo = 'PC' THEN pc.numeroIP
+    END as numero_ip,
+    CASE 
+        WHEN act.tipo_activo = 'Laptop' THEN lap.mac
+        WHEN act.tipo_activo = 'PC' THEN pc.mac
+    END as mac_address,
     u.username as usuario_asigno
 FROM asignacion asig
 INNER JOIN persona p ON asig.id_persona = p.id_persona
-INNER JOIN activo a ON asig.id_activo = a.id_activo
-LEFT JOIN laptop l ON a.id_laptop = l.id_laptop
-LEFT JOIN pc pc ON a.id_pc = pc.id_pc
+LEFT JOIN localidad l ON p.id_localidad = l.id_localidad
+LEFT JOIN area a ON p.id_area = a.id_area
+LEFT JOIN empresa e ON p.id_empresa = e.id_empresa
+LEFT JOIN situacion_personal sp ON p.id_situacion_personal = sp.id_situacion
+LEFT JOIN tipo_persona tp ON p.id_tipo_persona = tp.id_tipo_persona
+LEFT JOIN persona jefe ON p.jefe_inmediato = jefe.id_persona
+INNER JOIN activo act ON asig.id_activo = act.id_activo
+LEFT JOIN laptop lap ON act.id_laptop = lap.id_laptop
+LEFT JOIN pc pc ON act.id_pc = pc.id_pc
 LEFT JOIN usuario u ON asig.id_usuario = u.id_usuario
 ORDER BY asig.fecha_asignacion DESC";
 
@@ -101,16 +124,6 @@ while ($fila = sqlsrv_fetch_array($asignaciones, SQLSRV_FETCH_ASSOC)) {
         <a class="logout" href="../auth/logout.php">Cerrar sesión</a>
     </div>
 </header>
-
-<?php
-// Display success/error messages
-if (isset($_GET['success'])) {
-    echo '<div style="background: #d4edda; color: #155724; padding: 10px; margin: 10px; border-radius: 5px;">Operación completada exitosamente.</div>';
-}
-if (isset($_GET['error'])) {
-    echo '<div style="background: #f8d7da; color: #721c24; padding: 10px; margin: 10px; border-radius: 5px;">Error: ' . htmlspecialchars($_GET['error']) . '</div>';
-}
-?>
 
 <a href="vista_admin.php" class="back-button">
     <img src="../../img/flecha-atras.png" alt="Atrás"> Atrás
@@ -205,8 +218,17 @@ if (isset($_GET['error'])) {
                             data-persona="<?= htmlspecialchars($a['persona_nombre']) ?>"
                             data-email="<?= htmlspecialchars($a['email'] ?? 'Sin email') ?>"
                             data-telefono="<?= htmlspecialchars($a['telefono'] ?? 'Sin teléfono') ?>"
+                            data-localidad="<?= htmlspecialchars($a['localidad_nombre'] ?? 'Sin localidad') ?>"
+                            data-area="<?= htmlspecialchars($a['area_nombre'] ?? 'Sin área') ?>"
+                            data-empresa="<?= htmlspecialchars($a['empresa_nombre'] ?? 'Sin empresa') ?>"
+                            data-situacion="<?= htmlspecialchars($a['situacion_personal'] ?? 'Sin situación') ?>"
+                            data-tipo-persona="<?= htmlspecialchars($a['nombre_tipo_persona'] ?? 'Sin tipo') ?>"
+                            data-jefe="<?= htmlspecialchars($a['jefe_inmediato'] ?? 'Sin jefe inmediato') ?>"
                             data-activo="<?= htmlspecialchars($a['activo_descripcion']) ?>"
+                            data-tipo-activo="<?= htmlspecialchars($a['tipo_activo']) ?>"
                             data-serial="<?= htmlspecialchars($a['numero_serial'] ?? 'Sin número de serie') ?>"
+                            data-ip="<?= htmlspecialchars($a['numero_ip'] ?? 'Sin IP') ?>"
+                            data-mac="<?= htmlspecialchars($a['mac_address'] ?? 'Sin MAC') ?>"
                             data-fecha-asignacion="<?= $fecha_asignacion ?: 'Sin fecha' ?>"
                             data-fecha-retorno="<?= $fecha_retorno_display ?: 'Pendiente' ?>"
                             data-observaciones="<?= htmlspecialchars($a['observaciones'] ?? 'Sin observaciones') ?>"
@@ -223,7 +245,7 @@ if (isset($_GET['error'])) {
                                 data-id="<?= htmlspecialchars($a['id_asignacion']) ?>"
                                 data-id-persona="<?= htmlspecialchars($a['id_persona'] ?? '') ?>"
                                 data-id-activo="<?= htmlspecialchars($a['id_activo']) ?>"
-                                data-fecha_asignacion="<?= $fecha_asignacion_input ?>"
+                                data-fecha-asignacion="<?= $fecha_asignacion_input ?>"
                                 data-observaciones="<?= htmlspecialchars($a['observaciones'] ?? '') ?>"
                                 title="Editar asignación"
                             >
@@ -285,8 +307,11 @@ if (isset($_GET['error'])) {
             <select name="id_activo" id="id_activo" required>
                 <option value="">Seleccione un activo...</option>
                 <?php while ($activo = sqlsrv_fetch_array($activos_disponibles, SQLSRV_FETCH_ASSOC)): ?>
-                    <option value="<?= $activo['id_activo'] ?>" data-estado="<?= $activo['estado'] ?>">
+                    <option value="<?= $activo['id_activo'] ?>" 
+                            data-estado="<?= $activo['estado'] ?>"
+                            data-estado-asignacion="<?= $activo['estado_asignacion'] ?>">
                         <?= htmlspecialchars($activo['descripcion_activo']) ?>
+                        <?= $activo['estado_asignacion'] === 'Asignado' ? ' (Actualmente asignado)' : '' ?>
                     </option>
                 <?php endwhile; ?>
             </select>
@@ -334,49 +359,108 @@ if (isset($_GET['error'])) {
 <div id="modalVisualizacion" class="modal">
     <div class="modal-content detalles">
         <span class="close close-view">&times;</span>
-        <h3>Detalles de la Asignación</h3>
+        <h3>Detalles Completos de la Asignación</h3>
         
         <div class="detalles-grid">
-            <div class="detalle-item">
-                <strong>Persona Asignada:</strong>
-                <span id="view-persona"></span>
+            <!-- Sección: Información de la Persona -->
+            <div class="seccion-detalles">
+                <h4>📋 Información de la Persona</h4>
+                <div class="detalle-item">
+                    <strong>Nombre Completo:</strong>
+                    <span id="view-persona"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Email:</strong>
+                    <span id="view-email"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Teléfono:</strong>
+                    <span id="view-telefono"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Localidad:</strong>
+                    <span id="view-localidad"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Área:</strong>
+                    <span id="view-area"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Empresa:</strong>
+                    <span id="view-empresa"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Situación Personal:</strong>
+                    <span id="view-situacion"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Tipo de Persona:</strong>
+                    <span id="view-tipo-persona"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Jefe Inmediato:</strong>
+                    <span id="view-jefe"></span>
+                </div>
             </div>
-            <div class="detalle-item">
-                <strong>Email:</strong>
-                <span id="view-email"></span>
+
+            <!-- Sección: Información del Activo -->
+            <div class="seccion-detalles">
+                <h4>💻 Información del Activo</h4>
+                <div class="detalle-item">
+                    <strong>Activo Asignado:</strong>
+                    <span id="view-activo"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Tipo de Activo:</strong>
+                    <span id="view-tipo-activo"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Número de Serie:</strong>
+                    <span id="view-serial"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Dirección IP:</strong>
+                    <span id="view-ip"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Dirección MAC:</strong>
+                    <span id="view-mac"></span>
+                </div>
             </div>
-            <div class="detalle-item">
-                <strong>Teléfono:</strong>
-                <span id="view-telefono"></span>
+
+            <!-- Sección: Información de la Asignación -->
+            <div class="seccion-detalles">
+                <h4>📅 Información de la Asignación</h4>
+                <div class="detalle-item">
+                    <strong>Fecha de Asignación:</strong>
+                    <span id="view-fecha-asignacion"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Fecha de Retorno:</strong>
+                    <span id="view-fecha-retorno"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Estado Actual:</strong>
+                    <span id="view-estado"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Usuario que Asignó:</strong>
+                    <span id="view-usuario"></span>
+                </div>
+                <div class="detalle-item">
+                    <strong>Duración de la Asignación:</strong>
+                    <span id="view-duracion"></span>
+                </div>
             </div>
-            <div class="detalle-item">
-                <strong>Activo Asignado:</strong>
-                <span id="view-activo"></span>
+            
+            <!-- Observaciones -->
+            <div class="seccion-detalles">
+                <h4>Observaciones</h4>
+                <div class="detalle-item observaciones-item">
+                    <div id="view-observaciones" class="observaciones-texto"></div>
+                </div>
             </div>
-            <div class="detalle-item">
-                <strong>Número de Serie:</strong>
-                <span id="view-serial"></span>
-            </div>
-            <div class="detalle-item">
-                <strong>Fecha de Asignación:</strong>
-                <span id="view-fecha-asignacion"></span>
-            </div>
-            <div class="detalle-item">
-                <strong>Fecha de Retorno:</strong>
-                <span id="view-fecha-retorno"></span>
-            </div>
-            <div class="detalle-item">
-                <strong>Estado:</strong>
-                <span id="view-estado"></span>
-            </div>
-            <div class="detalle-item">
-                <strong>Usuario que Asignó:</strong>
-                <span id="view-usuario"></span>
-            </div>
-            <div class="detalle-item" style="grid-column: span 2;">
-                <strong>Observaciones:</strong>
-                <span id="view-observaciones"></span>
-            </div>
+
         </div>
     </div>
 </div>

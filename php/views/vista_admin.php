@@ -62,7 +62,9 @@ include("../includes/verificar_acceso.php");
             <tr>
                 <td><a href="crud_laptop.php"><img src="../../img/tenor.gif"><p>Crear Laptop</p></a></td>
                 <td><a href="crud_pc.php"><img src="../../img/tenor.gif"><p>Crear PC</p></a></td>
-               <td><a href="crud_servidor.php"><img src="../../img/tenor.gif"><p>Crear Servidor</p></a></td>
+                <td><a href="crud_servidor.php"><img src="../../img/tenor.gif"><p>Crear Servidor</p></a></td>
+                <td><a href="crud_almacen.php"><img src="../../img/tenor.gif"><p>Crear Almacen</p></a></td>
+                <td><a href="crud_servidor.php"><img src="../../img/tenor.gif"><p>Crear Servidor</p></a></td>
             </tr>
 
             
