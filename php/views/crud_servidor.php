@@ -17,8 +17,9 @@ $empresas = sqlsrv_query($conn, "SELECT id_empresa, nombre FROM empresa");
 $sql_marcas = "SELECT m.id_marca, m.nombre 
                FROM marca m 
                INNER JOIN tipo_marca tm ON m.id_tipo_marca = tm.id_tipo_marca 
-               WHERE tm.nombre = 'Servidor' OR tm.nombre IS NULL
+               WHERE tm.nombre = 'Servidor'
                ORDER BY m.nombre";
+
 $marcas = sqlsrv_query($conn, $sql_marcas);
 
 $estados = sqlsrv_query($conn, "SELECT id_estado_activo, vestado_activo FROM estado_activo");
@@ -98,7 +99,7 @@ SELECT DISTINCT
     (
         SELECT STRING_AGG(
             CASE 
-                WHEN sap.id_procesador IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', ISNULL(mp.nombre + ' ', '') + pr.modelo + ISNULL(' ' + pr.generacion, ''))
+                WHEN sap.id_procesador IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', ISNULL(mp.nombre + ' ', '') + p.modelo + ISNULL(' ' + p.generacion, ''))
                 WHEN sap.id_procesador_generico IS NOT NULL THEN CONCAT('Slot ', sa.id_slot, ': ', pg.modelo + ISNULL(' ' + pg.generacion, ''))
                 ELSE CONCAT('Slot ', sa.id_slot, ': Libre')
             END, 
@@ -106,8 +107,8 @@ SELECT DISTINCT
         )
         FROM slot_activo sa 
         LEFT JOIN slot_activo_procesador sap ON sa.id_slot = sap.id_slot
-        LEFT JOIN procesador pr ON sap.id_procesador = pr.id_procesador
-        LEFT JOIN marca mp ON pr.id_marca = mp.id_marca
+        LEFT JOIN procesador p ON sap.id_procesador = p.id_procesador
+        LEFT JOIN marca mp ON p.id_marca = mp.id_marca
         LEFT JOIN procesador_generico pg ON sap.id_procesador_generico = pg.id_procesador_generico
         WHERE sa.id_activo = a.id_activo AND sa.tipo_slot = 'PROCESADOR'
     ) as slots_cpu_texto,
@@ -173,7 +174,7 @@ WHERE a.tipo_activo = 'Servidor'
 
 $activos = sqlsrv_query($conn, $sql);
 if ($activos === false) {
-    die("Error en consulta de Servidores: " . print_r(sqlsrv_errors(), true));
+    die("Error en consulta de activos: " . print_r(sqlsrv_errors(), true));
 }
 
 // Procesar resultados
@@ -213,11 +214,11 @@ $activos = $filas_temp;
 <div class="main-container">
     <div class="top-bar">
         <h2>Crear nuevo Servidor</h2>
-        <input type="text" id="buscador" placeholder="Buscar Servidor">
+        <input type="text" id="buscador" placeholder="Buscar servidor">
         <button id="btnNuevo">+ NUEVO</button>
     </div>
 
-    <!-- Tabla de Servidores -->
+    <!-- Tabla de servidores -->
     <table id="tablaServidores">
         <thead>
             <tr>
@@ -240,25 +241,10 @@ $activos = $filas_temp;
             $counter = 1;
             
             if (count($activos) === 0) {
-                echo "<tr><td colspan='12' style='text-align:center;'>No se encontraron Servidores registrados</td></tr>";
+                echo "<tr><td colspan='12' style='text-align:center;'>No se encontraron servidores registrados</td></tr>";
             }
             
             foreach ($activos as $a) { 
-                $estado_clase = '';
-                if (isset($a['estado'])) {
-                    switch(strtolower($a['estado'])) {
-                        case 'disponible':
-                            $estado_clase = 'estado-disponible';
-                            break;
-                        case 'asignado':
-                            $estado_clase = 'estado-asignado';
-                            break;
-                        case 'malogrado':
-                            $estado_clase = 'estado-malogrado';
-                            break;
-                    }
-                }
-                
                 // Manejar fechas
                 $fecha_compra = "";
                 $fecha_garantia = "";
@@ -279,7 +265,7 @@ $activos = $filas_temp;
                     }
                 }
             ?>
-            <tr class="<?= $estado_clase ?>">
+            <tr>
                 <td><?= $counter++ ?></td>
                 <td><?= htmlspecialchars($a['nombreEquipo'] ?? '') ?></td>
                 <td><?= htmlspecialchars($a['modelo'] ?? '') ?></td>
@@ -291,7 +277,7 @@ $activos = $filas_temp;
                 <td><?= htmlspecialchars($a['marca'] ?? '') ?></td>
                 <td><?= htmlspecialchars($a['empresa'] ?? '') ?></td>
                 
-                <!-- Columna Opciones QR -->
+                <!-- Opciones QR -->
                 <td>
                     <div class="opciones-qr">
                         <?php if(isset($a['ruta_qr']) && !empty($a['ruta_qr'])): ?>
@@ -323,7 +309,6 @@ $activos = $filas_temp;
                             data-tipo="Servidor"
                             data-marca="<?= htmlspecialchars($a['marca'] ?? '') ?>"
                             data-empresa="<?= htmlspecialchars($a['empresa'] ?? 'No asignado') ?>"
-                            data-asistente="<?= htmlspecialchars($nombre_usuario_sesion) ?>"
                             data-fechacompra="<?= htmlspecialchars($fecha_compra) ?>"
                             data-garantia="<?= htmlspecialchars($fecha_garantia) ?>"
                             data-preciocompra="<?= htmlspecialchars($a['precioCompra'] ?? '') ?>"
@@ -331,6 +316,7 @@ $activos = $filas_temp;
                             data-ordencompra="<?= htmlspecialchars($a['ordenCompra'] ?? '') ?>"
                             data-estadogarantia="<?= htmlspecialchars($a['estadoGarantia'] ?? '') ?>"
                             data-observaciones="<?= htmlspecialchars($a['observaciones'] ?? '') ?>"
+                            data-asistente="<?= htmlspecialchars($nombre_usuario_sesion) ?>"
                             data-cpu="<?= htmlspecialchars($a['slots_cpu_texto'] ?? 'No especificado') ?>"
                             data-ram="<?= htmlspecialchars($a['slots_ram_texto'] ?? 'No especificado') ?>"
                             data-almacenamiento="<?= htmlspecialchars($a['slots_almacenamiento_texto'] ?? 'No especificado') ?>"
@@ -365,8 +351,8 @@ $activos = $filas_temp;
                         </button>
 
                         <?php if (!isset($a['estado']) || strtolower($a['estado']) !== 'asignado'): ?>
-                            <!-- Botón eliminar (solo visible si no está asignado) -->
-                            <form method="POST" action="../controllers/procesar_servidor.php" onsubmit="return confirm('¿Eliminar este Servidor?');">
+                            <!-- Botón eliminar -->
+                            <form method="POST" action="../controllers/procesar_servidor.php" onsubmit="return confirm('¿Eliminar este servidor?');">
                                 <input type="hidden" name="accion" value="eliminar">
                                 <input type="hidden" name="id_activo" value="<?= htmlspecialchars($a['id_activo']) ?>">
                                 <button type="submit" class="btn-icon">
@@ -459,14 +445,13 @@ $activos = $filas_temp;
                 echo "</select>";
             }
 
-            // Mostrar los selects necesarios para Servidor
             select("id_empresa", $empresas, "id_empresa", "nombre", "Empresa");
             select("id_marca", $marcas, "id_marca", "nombre", "Marca");
             select("id_estado_activo", $estados, "id_estado_activo", "vestado_activo", "Estado");
             ?>
 
             <div class="componentes-section">
-                <h4>Configuración de Slots para Servidor</h4>
+                <h4>Configuración de Slots</h4>
                 
                 <!-- Toggle para filtrar tipos de componentes -->
                 <div class="filtro-componentes">
@@ -478,16 +463,16 @@ $activos = $filas_temp;
                 </div>
                 
                 <div class="slots-config">
-                    <label>Cantidad de slots de CPU (Servidores soportan múltiples CPUs):</label>
-                    <input type="number" name="slots_cpu" id="slots_cpu" min="1" max="4" value="2" required>
+                    <label>Cantidad de slots de CPU:</label>
+                    <input type="number" name="slots_cpu" id="slots_cpu" min="1" max="4" value="1" required>
                     
-                    <label>Cantidad de slots de RAM (Servidores tienen muchos slots):</label>
-                    <input type="number" name="slots_ram" id="slots_ram" min="2" max="24" value="8" required>
+                    <label>Cantidad de slots de RAM:</label>
+                    <input type="number" name="slots_ram" id="slots_ram" min="2" max="24" value="2" required>
                     
                     <label>Cantidad de slots de Almacenamiento:</label>
-                    <input type="number" name="slots_almacenamiento" id="slots_almacenamiento" min="2" max="12" value="4" required>
+                    <input type="number" name="slots_almacenamiento" id="slots_almacenamiento" min="2" max="12" value="2" required>
                     
-                    <label>Cantidad de slots de Tarjeta de Video (opcional):</label>
+                    <label>Cantidad de slots de Tarjeta de Video:</label>
                     <input type="number" name="slots_tarjeta_video" id="slots_tarjeta_video" min="0" max="8" value="0">
                 </div>
 
@@ -562,7 +547,6 @@ $activos = $filas_temp;
                 </div>
             </div>
 
-            <!-- Hidden input para datos de slots -->
             <input type="hidden" name="slots_data" id="slotsDataHidden">
 
             <br>
@@ -666,7 +650,7 @@ $activos = $filas_temp;
             <div class="seccion-detalles">
                 <h4>Especificaciones Técnicas</h4>
                 <div class="detalle-item">
-                    <strong>Procesador(es) (CPU):</strong>
+                    <strong>Procesador (CPU):</strong>
                     <span id="view-cpu"></span>
                 </div>
                 <div class="detalle-item">
@@ -691,7 +675,7 @@ $activos = $filas_temp;
                 </div>
             </div>
 
-            <!-- Código QR - ocupar ancho completo -->
+            <!-- Código QR -->
             <div class="seccion-detalles qr-section">
                 <h4>Código QR</h4>
                 <div class="detalle-item qr-container">
@@ -708,4 +692,3 @@ $activos = $filas_temp;
 <script src="../../js/admin/crud_servidor.js"></script>
 
 </body>
-</html>

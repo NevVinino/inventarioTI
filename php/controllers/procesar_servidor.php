@@ -34,7 +34,10 @@ function generarQR($id_activo, $conn) {
     
     // Crear directorio QR si no existe
     $dir = __DIR__ . '/../../img';
+    error_log("Directorio base img: $dir");
+    
     if (!file_exists($dir)) {
+        error_log("Creando directorio img...");
         if (!mkdir($dir, 0777, true)) {
             error_log("GenerarQR Servidor: No se pudo crear directorio img: $dir");
             return false;
@@ -42,7 +45,10 @@ function generarQR($id_activo, $conn) {
     }
     
     $qr_dir = $dir . '/qr';
+    error_log("Directorio QR: $qr_dir");
+    
     if (!file_exists($qr_dir)) {
+        error_log("Creando directorio qr...");
         if (!mkdir($qr_dir, 0777, true)) {
             error_log("GenerarQR Servidor: No se pudo crear directorio qr: $qr_dir");
             return false;
@@ -54,38 +60,65 @@ function generarQR($id_activo, $conn) {
     $qr_path = "img/qr/" . $qr_filename; // Ruta relativa para BD
     $filepath = $qr_dir . '/' . $qr_filename; // Ruta absoluta para archivo
     
+    error_log("Archivo QR se guardará en: $filepath");
+    error_log("Ruta relativa para BD: $qr_path");
+    
     // URL a la que apuntará el QR
     $baseURL = 'http://localhost:8000';
     $url_qr = $baseURL . "/php/views/user/detalle_activo.php?id=" . $id_activo;
     
+    error_log("URL del QR: $url_qr");
+    
     try {
+        // Incluir la librería
+        error_log("Incluyendo librería phpqrcode...");
         include_once $qrlib_path;
         
+        // Verificar que la clase existe
         if (!class_exists('QRcode')) {
-            error_log("GenerarQR Servidor: Clase QRcode no encontrada");
+            error_log("GenerarQR Servidor: Clase QRcode no encontrada después de incluir $qrlib_path");
             return false;
         }
         
-        // Generar el QR
+        error_log("Clase QRcode disponible, generando QR...");
+        error_log("GenerarQR Servidor: Generando QR para URL: $url_qr en archivo: $filepath");
+        
+        // Generar el QR con parámetros específicos
         QRcode::png($url_qr, $filepath, QR_ECLEVEL_L, 10, 2);
         
+        error_log("Comando QRcode::png ejecutado");
+        
+        // Verificar si se creó el archivo
         if (!file_exists($filepath)) {
             error_log("GenerarQR Servidor: Archivo QR no se creó en $filepath");
+            
+            // Verificar permisos del directorio
+            $permisos = fileperms($qr_dir);
+            error_log("Permisos del directorio qr: " . decoct($permisos));
+            
             return false;
         }
         
+        // Verificar el tamaño del archivo
         $filesize = filesize($filepath);
         if ($filesize === false || $filesize < 100) {
-            error_log("GenerarQR Servidor: Archivo QR corrupto. Tamaño: " . ($filesize ?: 'desconocido'));
+            error_log("GenerarQR Servidor: Archivo QR creado pero parece corrupto. Tamaño: " . ($filesize ?: 'desconocido'));
             unlink($filepath);
             return false;
         }
         
+        error_log("GenerarQR Servidor: Archivo QR creado exitosamente. Tamaño: $filesize bytes");
+        
         // Guardar en base de datos
+        error_log("Guardando información del QR en la base de datos...");
+        
+        // Verificar si ya existe un QR para este activo
         $sql_check_exists = "SELECT id_qr FROM qr_activo WHERE id_activo = ?";
         $stmt_check_exists = sqlsrv_query($conn, $sql_check_exists, [$id_activo]);
         
         if ($stmt_check_exists && sqlsrv_fetch_array($stmt_check_exists)) {
+            error_log("Actualizando QR existente...");
+            
             // Eliminar QR anterior si existe
             $sql_get_old = "SELECT ruta_qr FROM qr_activo WHERE id_activo = ?";
             $stmt_get_old = sqlsrv_query($conn, $sql_get_old, [$id_activo]);
@@ -93,10 +126,11 @@ function generarQR($id_activo, $conn) {
                 $old_qr = __DIR__ . '/../../' . $row['ruta_qr'];
                 if (file_exists($old_qr)) {
                     unlink($old_qr);
+                    error_log("GenerarQR Servidor: QR anterior eliminado: $old_qr");
                 }
             }
             
-            // Actualizar registro
+            // Actualizar ruta en la base de datos
             $sql_update = "UPDATE qr_activo SET ruta_qr = ?, fecha_creacion = GETDATE() WHERE id_activo = ?";
             $stmt_update = sqlsrv_query($conn, $sql_update, [$qr_path, $id_activo]);
             
@@ -105,8 +139,12 @@ function generarQR($id_activo, $conn) {
                 unlink($filepath);
                 return false;
             }
+            
+            error_log("GenerarQR Servidor: Registro QR actualizado en BD");
         } else {
-            // Crear nuevo registro
+            error_log("Creando nuevo registro de QR...");
+            
+            // Crear nuevo registro de QR
             $sql_insert = "INSERT INTO qr_activo (id_activo, ruta_qr, fecha_creacion) VALUES (?, ?, GETDATE())";
             $stmt_insert = sqlsrv_query($conn, $sql_insert, [$id_activo, $qr_path]);
             
@@ -115,7 +153,11 @@ function generarQR($id_activo, $conn) {
                 unlink($filepath);
                 return false;
             }
+            
+            error_log("GenerarQR Servidor: Nuevo registro QR creado en BD");
         }
+        
+        error_log("GenerarQR Servidor: QR generado exitosamente para activo $id_activo");
         
         $resultado = [
             'id_activo' => $id_activo,
@@ -124,11 +166,21 @@ function generarQR($id_activo, $conn) {
             'url' => $url_qr
         ];
         
+        error_log("Resultado final: " . print_r($resultado, true));
         error_log("=== FIN FUNCIÓN GENERAR QR SERVIDOR EXITOSO ===");
+        
         return $resultado;
         
     } catch (Exception $e) {
-        error_log("GenerarQR Servidor: Excepción: " . $e->getMessage());
+        error_log("GenerarQR Servidor: Excepción capturada: " . $e->getMessage());
+        error_log("Stack trace: " . $e->getTraceAsString());
+        if (file_exists($filepath)) {
+            unlink($filepath);
+        }
+        return false;
+    } catch (Error $e) {
+        error_log("GenerarQR Servidor: Error fatal capturado: " . $e->getMessage());
+        error_log("Stack trace: " . $e->getTraceAsString());
         if (file_exists($filepath)) {
             unlink($filepath);
         }
@@ -283,34 +335,61 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         ? $_POST["id_usuario"] 
         : ($_SESSION["id_usuario"] ?? null);
 
-    // Handler AJAX: generar QR
+    // Handler AJAX: generar QR sin procesar acción crear/editar/eliminar
     if (isset($_POST['generar_qr']) && $_POST['generar_qr']) {
         $id_a = isset($_POST['id_activo']) ? (int) $_POST['id_activo'] : 0;
         
         header('Content-Type: application/json');
 
+        error_log("=== INICIO GENERACIÓN QR SERVIDOR AJAX ===");
+        error_log("ID recibido: " . $id_a);
+        error_log("POST data: " . print_r($_POST, true));
+
         if ($id_a <= 0) {
+            error_log("GenerarQR Servidor AJAX: ID inválido recibido - $id_a");
             echo json_encode(['success' => false, 'error' => 'ID inválido recibido: ' . $id_a]);
             exit;
         }
 
+        error_log("GenerarQR Servidor AJAX: Iniciando generación para activo ID $id_a");
+        
         // Verificar que el activo existe y es un Servidor
         $sql_verify = "SELECT id_activo FROM activo WHERE id_activo = ? AND tipo_activo = 'Servidor'";
         $stmt_verify = sqlsrv_query($conn, $sql_verify, [$id_a]);
         
-        if (!$stmt_verify || !sqlsrv_fetch_array($stmt_verify)) {
+        if (!$stmt_verify) {
+            error_log("Error en consulta de verificación Servidor: " . print_r(sqlsrv_errors(), true));
+            echo json_encode(['success' => false, 'error' => 'Error verificando Servidor en BD']);
+            exit;
+        }
+        
+        if (!sqlsrv_fetch_array($stmt_verify)) {
+            error_log("Servidor no encontrado en BD: ID $id_a");
             echo json_encode(['success' => false, 'error' => 'Servidor no encontrado en la base de datos']);
             exit;
         }
         
+        error_log("Servidor verificado, procediendo a generar QR...");
+        
         $qr = generarQR($id_a, $conn);
         if ($qr) {
+            error_log("GenerarQR Servidor AJAX: QR generado exitosamente para activo $id_a");
+            error_log("Datos del QR generado: " . print_r($qr, true));
             echo json_encode(['success' => true, 'data' => $qr]);
         } else {
+            error_log("GenerarQR Servidor AJAX: Falló la generación de QR para activo $id_a");
+            
+            // Intentar capturar errores específicos
             $last_error = error_get_last();
             $error_details = $last_error ? $last_error['message'] : 'Error desconocido';
-            echo json_encode(['success' => false, 'error' => 'No se pudo generar QR. Detalles: ' . $error_details]);
+            
+            echo json_encode([
+                'success' => false, 
+                'error' => 'No se pudo generar QR. Detalles: ' . $error_details
+            ]);
         }
+        
+        error_log("=== FIN GENERACIÓN QR SERVIDOR AJAX ===");
         exit;
     }
 
@@ -374,8 +453,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     if ($accion === "crear") {
         // Obtener configuración de slots - ADAPTADA PARA SERVIDOR
         $slots_cpu = (isset($_POST["slots_cpu"]) && $_POST["slots_cpu"] !== '') ? (int)$_POST["slots_cpu"] : 2;
-        $slots_ram = (isset($_POST["slots_ram"]) && $_POST["slots_ram"] !== '') ? (int)$_POST["slots_ram"] : 8;
-        $slots_almacenamiento = (isset($_POST["slots_almacenamiento"]) && $_POST["slots_almacenamiento"] !== '') ? (int)$_POST["slots_almacenamiento"] : 4;
+        $slots_ram = (isset($_POST["slots_ram"]) && $_POST["slots_ram"] !== '') ? (int)$_POST["slots_ram"] : 2;
+        $slots_almacenamiento = (isset($_POST["slots_almacenamiento"]) && $_POST["slots_almacenamiento"] !== '') ? (int)$_POST["slots_almacenamiento"] : 2;
         $slots_tarjeta_video = (isset($_POST["slots_tarjeta_video"]) && $_POST["slots_tarjeta_video"] !== '') ? (int)$_POST["slots_tarjeta_video"] : 0;
         
         // Validar límites de slots - ADAPTADA PARA SERVIDOR
@@ -479,9 +558,26 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 error_log("Datos de slots Servidor procesados: " . print_r($slots_data, true));
                 
                 if (!empty($slots_data)) {
-                    // Asignar CPU
-                    if (isset($slots_data['cpu']) && !empty($slots_data['cpu'])) {
-                        error_log("Asignando CPU Servidor: " . $slots_data['cpu']);
+                    // CORREGIDO: Asignar múltiples CPUs
+                    if (isset($slots_data['cpus']) && is_array($slots_data['cpus'])) {
+                        foreach ($slots_data['cpus'] as $cpu_data) {
+                            if (!empty($cpu_data)) {
+                                try {
+                                    error_log("Asignando CPU Servidor: " . $cpu_data);
+                                    asignarComponenteASlot($id_activo_nuevo, 'PROCESADOR', $cpu_data, $conn);
+                                } catch (Exception $e) {
+                                    if (strpos($e->getMessage(), 'No hay slots disponibles') !== false) {
+                                        error_log("Advertencia: No hay más slots de CPU disponibles en Servidor. CPU: $cpu_data no asignada.");
+                                        break;
+                                    } else {
+                                        throw $e;
+                                    }
+                                }
+                            }
+                        }
+                    } else if (isset($slots_data['cpu']) && !empty($slots_data['cpu'])) {
+                        // Compatibilidad hacia atrás para un solo CPU
+                        error_log("Asignando CPU único Servidor: " . $slots_data['cpu']);
                         asignarComponenteASlot($id_activo_nuevo, 'PROCESADOR', $slots_data['cpu'], $conn);
                     }
                     
@@ -587,8 +683,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         
         // Obtener configuración de slots para edición de Servidor
         $slots_cpu = (isset($_POST["slots_cpu"]) && $_POST["slots_cpu"] !== '') ? (int)$_POST["slots_cpu"] : 2;
-        $slots_ram = (isset($_POST["slots_ram"]) && $_POST["slots_ram"] !== '') ? (int)$_POST["slots_ram"] : 8;
-        $slots_almacenamiento = (isset($_POST["slots_almacenamiento"]) && $_POST["slots_almacenamiento"] !== '') ? (int)$_POST["slots_almacenamiento"] : 4;
+        $slots_ram = (isset($_POST["slots_ram"]) && $_POST["slots_ram"] !== '') ? (int)$_POST["slots_ram"] : 2;
+        $slots_almacenamiento = (isset($_POST["slots_almacenamiento"]) && $_POST["slots_almacenamiento"] !== '') ? (int)$_POST["slots_almacenamiento"] : 2;
         $slots_tarjeta_video = (isset($_POST["slots_tarjeta_video"]) && $_POST["slots_tarjeta_video"] !== '') ? (int)$_POST["slots_tarjeta_video"] : 0;
         
         // Validar límites de slots para edición de Servidor
@@ -666,8 +762,23 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $slots_data = isset($_POST['slots_data']) ? json_decode($_POST['slots_data'], true) : [];
                 
                 if (!empty($slots_data)) {
-                    // Reasignar componentes
-                    if (isset($slots_data['cpu']) && !empty($slots_data['cpu'])) {
+                    // CORREGIDO: Reasignar múltiples CPUs en edición
+                    if (isset($slots_data['cpus']) && is_array($slots_data['cpus'])) {
+                        foreach ($slots_data['cpus'] as $cpu_data) {
+                            if (!empty($cpu_data)) {
+                                try {
+                                    asignarComponenteASlot($id_activo, 'PROCESADOR', $cpu_data, $conn);
+                                } catch (Exception $e) {
+                                    if (strpos($e->getMessage(), 'No hay slots disponibles') !== false) {
+                                        break;
+                                    } else {
+                                        throw $e;
+                                    }
+                                }
+                            }
+                        }
+                    } else if (isset($slots_data['cpu']) && !empty($slots_data['cpu'])) {
+                        // Compatibilidad hacia atrás para un solo CPU
                         asignarComponenteASlot($id_activo, 'PROCESADOR', $slots_data['cpu'], $conn);
                     }
                     
@@ -823,7 +934,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     exit;
 }
 
-// Función para crear slots de un activo
+// Función para crear slots de un activo - ACTUALIZADA para no crear slots con cantidad 0
 function crearSlots($id_activo, $tipo_activo, $slots_cpu, $slots_ram, $slots_almacenamiento, $slots_tarjeta_video, $conn) {
     $tipos_slots = [
         'PROCESADOR' => $slots_cpu,
@@ -833,6 +944,7 @@ function crearSlots($id_activo, $tipo_activo, $slots_cpu, $slots_ram, $slots_alm
     ];
     
     foreach ($tipos_slots as $tipo_slot => $cantidad) {
+        // Solo crear slots si la cantidad es mayor a 0
         if ($cantidad > 0) {
             for ($i = 0; $i < $cantidad; $i++) {
                 $sql_slot = "INSERT INTO slot_activo (id_activo, tipo_activo, tipo_slot, estado) VALUES (?, ?, ?, 'disponible')";
@@ -849,8 +961,9 @@ function crearSlots($id_activo, $tipo_activo, $slots_cpu, $slots_ram, $slots_alm
     }
 }
 
-// Función para asignar componente a slot
+// Función para asignar componente a slot - ACTUALIZADA para tarjetas de video
 function asignarComponenteASlot($id_activo, $tipo_slot, $componente_data, $conn) {
+    // Parsear el componente_data que viene como "tipo_id" (ej: "detallado_5" o "generico_3")
     list($tipo_componente, $componente_id) = explode('_', $componente_data);
     
     // Buscar slot disponible

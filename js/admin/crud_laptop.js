@@ -149,18 +149,26 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // --- función global para recopilar datos de slots --- ACTUALIZADA para tarjetas de video
+    // --- función global para recopilar datos de slots --- ACTUALIZADA para múltiples CPUs
     window.recopilarDatosSlots = function() {
         const datos = {
             cpu: null,
+            cpus: [], // NUEVO: array para múltiples CPUs
             rams: [],
             almacenamientos: [],
-            tarjetas_video: [] // NUEVO
+            tarjetas_video: []
         };
         
-        const cpuSlot = document.querySelector('select[data-tipo="cpu"][data-slot="0"]');
-        if (cpuSlot && cpuSlot.value) {
-            datos.cpu = cpuSlot.value;
+        // CORREGIDO: Recopilar TODOS los CPUs en lugar de solo el primero
+        document.querySelectorAll('select[data-tipo="cpu"]').forEach(slot => {
+            if (slot.value) {
+                datos.cpus.push(slot.value);
+            }
+        });
+        
+        // Mantener compatibilidad hacia atrás: si solo hay un CPU, asignarlo a cpu
+        if (datos.cpus.length > 0) {
+            datos.cpu = datos.cpus[0]; // Para validación
         }
         
         document.querySelectorAll('select[data-tipo="ram"]').forEach(slot => {
@@ -175,13 +183,13 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
         
-        // NUEVO: Recopilar datos de tarjetas de video
         document.querySelectorAll('select[data-tipo="tarjeta_video"]').forEach(slot => {
             if (slot.value) {
                 datos.tarjetas_video.push(slot.value);
             }
         });
         
+        console.log("📊 Datos recopilados de slots:", datos);
         return datos;
     };
 
@@ -196,16 +204,16 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    // --- funciones para guardar y restaurar valores de slots - ACTUALIZADAS para tarjeta de video ---
+    // --- funciones para guardar y restaurar valores de slots - CORREGIDAS para múltiples CPUs ---
     function guardarValoresSlots() {
         const valores = {
             cpu: {},
             ram: {},
             almacenamiento: {},
-            tarjeta_video: {} // NUEVO
+            tarjeta_video: {}
         };
         
-        // Guardar valores actuales en el sistema permanente
+        // CORREGIDO: Guardar TODOS los valores de CPU correctamente
         document.querySelectorAll('select[data-tipo="cpu"]').forEach(select => {
             const slot = select.getAttribute('data-slot');
             if (slot !== null && select.value && select.value !== '') {
@@ -216,6 +224,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 };
                 valores.cpu[slot] = valorData;
                 seleccionesPermanentes.cpu[slot] = valorData; // Guardar permanentemente
+                console.log(`💾 CPU guardado: slot ${slot} = ${select.value}`);
             }
         });
         
@@ -1074,15 +1083,16 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
-    // --- validación del formulario ---
+    // --- validación del formulario - CORREGIDA para múltiples CPUs ---
     if (form) {
         form.addEventListener("submit", function(event) {
             event.preventDefault();
             
             const datosSlots = recopilarDatosSlots();
             
-            if (!datosSlots.cpu) {
-                alert("Debe asignar un procesador (CPU) a un slot");
+            // CORREGIDO: Validar que haya al menos un CPU
+            if (!datosSlots.cpu && datosSlots.cpus.length === 0) {
+                alert("Debe asignar al menos un procesador (CPU) a un slot");
                 return false;
             }
             
@@ -1097,6 +1107,8 @@ document.addEventListener("DOMContentLoaded", function () {
             }
             
             // No validamos tarjetas de video obligatorias, pueden ser 0
+            
+            console.log("📋 Validación pasada. Datos a enviar:", datosSlots);
             
             const slotsDataInput = document.getElementById('slotsDataHidden');
             if (slotsDataInput) {

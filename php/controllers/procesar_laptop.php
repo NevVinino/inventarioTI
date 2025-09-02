@@ -584,9 +584,26 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 error_log("Datos de slots procesados: " . print_r($slots_data, true));
                 
                 if (!empty($slots_data)) {
-                    // Asignar CPU
-                    if (isset($slots_data['cpu']) && !empty($slots_data['cpu'])) {
-                        error_log("Asignando CPU: " . $slots_data['cpu']);
+                    // CORREGIDO: Asignar múltiples CPUs
+                    if (isset($slots_data['cpus']) && is_array($slots_data['cpus'])) {
+                        foreach ($slots_data['cpus'] as $cpu_data) {
+                            if (!empty($cpu_data)) {
+                                try {
+                                    error_log("Asignando CPU Laptop: " . $cpu_data);
+                                    asignarComponenteASlot($id_activo_nuevo, 'PROCESADOR', $cpu_data, $conn);
+                                } catch (Exception $e) {
+                                    if (strpos($e->getMessage(), 'No hay slots disponibles') !== false) {
+                                        error_log("Advertencia: No hay más slots de CPU disponibles en Laptop. CPU: $cpu_data no asignada.");
+                                        break;
+                                    } else {
+                                        throw $e;
+                                    }
+                                }
+                            }
+                        }
+                    } else if (isset($slots_data['cpu']) && !empty($slots_data['cpu'])) {
+                        // Compatibilidad hacia atrás para un solo CPU
+                        error_log("Asignando CPU único Laptop: " . $slots_data['cpu']);
                         asignarComponenteASlot($id_activo_nuevo, 'PROCESADOR', $slots_data['cpu'], $conn);
                     }
                     
@@ -771,11 +788,26 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $slots_data = isset($_POST['slots_data']) ? json_decode($_POST['slots_data'], true) : [];
                 
                 if (!empty($slots_data)) {
-                    // Reasignar CPU
-                    if (isset($slots_data['cpu']) && !empty($slots_data['cpu'])) {
+                    // CORREGIDO: Reasignar múltiples CPUs en edición
+                    if (isset($slots_data['cpus']) && is_array($slots_data['cpus'])) {
+                        foreach ($slots_data['cpus'] as $cpu_data) {
+                            if (!empty($cpu_data)) {
+                                try {
+                                    asignarComponenteASlot($id_activo, 'PROCESADOR', $cpu_data, $conn);
+                                } catch (Exception $e) {
+                                    if (strpos($e->getMessage(), 'No hay slots disponibles') !== false) {
+                                        break;
+                                    } else {
+                                        throw $e;
+                                    }
+                                }
+                            }
+                        }
+                    } else if (isset($slots_data['cpu']) && !empty($slots_data['cpu'])) {
+                        // Compatibilidad hacia atrás para un solo CPU
                         asignarComponenteASlot($id_activo, 'PROCESADOR', $slots_data['cpu'], $conn);
                     }
-                    
+
                     // Reasignar RAMs
                     if (isset($slots_data['rams']) && is_array($slots_data['rams'])) {
                         foreach ($slots_data['rams'] as $ram_data) {
