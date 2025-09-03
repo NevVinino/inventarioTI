@@ -256,6 +256,9 @@ $activos = $filas_temp;
                         case 'malogrado':
                             $estado_clase = 'estado-malogrado';
                             break;
+                        case 'almacen':
+                            $estado_clase = 'estado-almacen';
+                            break;
                     }
                 }
                 

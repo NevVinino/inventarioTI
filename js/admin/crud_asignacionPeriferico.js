@@ -1,72 +1,137 @@
-// Mostrar el modal
-const modal = document.getElementById("modalAsignacionPeriferico");
-const btnNuevo = document.getElementById("btnNuevo");
-const spanClose = document.querySelector(".close");
+document.addEventListener("DOMContentLoaded", function () {
+    const modal = document.getElementById("modalAsignacionPeriferico");
+    const modalRetorno = document.getElementById("modalRetorno");
+    const btnNuevo = document.getElementById("btnNuevo");
+    const form = document.getElementById("formAsignacionPeriferico");
+    const formRetorno = document.getElementById("formRetorno");
 
-        btnNuevo.onclick = () => {
-            // Limpiar el formulario
-            document.getElementById("accion").value = "crear";
-            document.getElementById("modal-title").textContent = "Crear Asignación de Periférico";
-            document.getElementById("id_asignacion_periferico").value = "";
-            document.getElementById("persona").selectedIndex = 0;
-            document.getElementById("periferico").selectedIndex = 0;
-            document.getElementById("fecha_asignacion").value = "";
-            document.getElementById("observaciones").value = "";
+    btnNuevo.addEventListener("click", function () {
+        document.getElementById("modal-title").textContent = "Registrar Asignación de Periférico";
+        document.getElementById("accion").value = "crear";
+        form.reset();
+        modal.style.display = "block";
+    });
+
+    // --- cerrar modales ---
+    document.querySelectorAll(".close").forEach(closeBtn => {
+        closeBtn.addEventListener("click", function() {
+            if (modal) modal.style.display = "none";
+            if (modalRetorno) modalRetorno.style.display = "none";
+        });
+    });
+
+    window.onclick = function (event) {
+        if (event.target == modal) {
+            modal.style.display = "none";
+        }
+        if (event.target == modalRetorno) {
+            modalRetorno.style.display = "none";
+        }
+    };
+
+    document.querySelectorAll(".btn-editar").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            document.getElementById("modal-title").textContent = "Editar Asignación de Periférico";
+            document.getElementById("accion").value = "editar";
+
+            document.getElementById("id_asignacion_periferico").value = btn.dataset.idAsignacionPeriferico;
+            document.getElementById("persona").value = btn.dataset.idPersona;
+            document.getElementById("periferico").value = btn.dataset.idPeriferico;
+            document.getElementById("fecha_asignacion").value = btn.dataset.fechaAsignacion;
+            document.getElementById("observaciones").value = btn.dataset.observaciones;
+
             modal.style.display = "block";
-        };
-spanClose.onclick = () => modal.style.display = "none";
-window.onclick = (e) => {
-    if (e.target === modal) modal.style.display = "none";
-};
+        });
+    });
 
-// Filtro de búsqueda
-const buscador = document.getElementById("buscador");
-const tabla = document.getElementById("tablaAsignacionesPerifericos").getElementsByTagName("tbody")[0];
+    // --- botones retornar ---
+    document.querySelectorAll(".btn-retornar").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            if (!modalRetorno) return;
 
-buscador.addEventListener("keyup", function () {
-    const filtro = buscador.value.toLowerCase();
-    const filas = tabla.getElementsByTagName("tr");
+            const idAsignacion = this.dataset.id;
+            const persona = this.dataset.persona;
+            const periferico = this.dataset.periferico;
 
-    for (let i = 0; i < filas.length; i++) {
-        const persona = filas[i].getElementsByTagName("td")[0];
-        const periferico = filas[i].getElementsByTagName("td")[1];
-        if (persona && periferico) {
-            const textoPersona = persona.textContent || persona.innerText;
-            const textoPeriferico = periferico.textContent || periferico.innerText;
-            const textoCompleto = textoPersona + " " + textoPeriferico;
-            filas[i].style.display = textoCompleto.toLowerCase().includes(filtro) ? "" : "none";
+            document.getElementById("retorno_id_asignacion").value = idAsignacion;
+            document.getElementById("retorno_persona").textContent = persona;
+            document.getElementById("retorno_periferico").textContent = periferico;
+
+            modalRetorno.style.display = "block";
+        });
+    });
+
+    const buscador = document.getElementById("buscador");
+    const filas = document.querySelectorAll("#tablaAsignacionesPerifericos tbody tr");
+
+    buscador.addEventListener("input", function () {
+        const valor = buscador.value.toLowerCase();
+        filas.forEach(function (fila) {
+            const texto = fila.textContent.toLowerCase();
+            fila.style.display = texto.includes(valor) ? "" : "none";
+        });
+    });
+
+    // --- validación formulario retorno ---
+    if (formRetorno) {
+        formRetorno.addEventListener("submit", function(event) {
+            const fechaRetorno = document.getElementById("fecha_retorno").value;
+
+            if (!fechaRetorno) {
+                event.preventDefault();
+                alert("La fecha de retorno es obligatoria.");
+                return false;
+            }
+
+            const hoy = new Date().toISOString().split('T')[0];
+            if (fechaRetorno > hoy) {
+                event.preventDefault();
+                alert("La fecha de retorno no puede ser posterior a hoy.");
+                return false;
+            }
+
+            if (!confirm("¿Está seguro de registrar el retorno de este periférico?")) {
+                event.preventDefault();
+                return false;
+            }
+        });
+    }
+
+    // Manejar mensajes de error y éxito
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('success')) {
+        // Mensaje de éxito se puede mostrar aquí si se desea
+        // Limpiar parámetro de la URL
+        if (history.replaceState) {
+            const url = new URL(window.location);
+            url.searchParams.delete('success');
+            window.history.replaceState({}, document.title, url.pathname + url.search);
         }
     }
-});
 
-document.querySelectorAll(".btn-editar").forEach(button => {
-    button.addEventListener("click", () => {
-        // Setear valores al formulario
-        document.getElementById("accion").value = "editar";
-        document.getElementById("modal-title").textContent = "Editar Asignación de Periférico";
-        document.getElementById("id_asignacion_periferico").value = button.dataset.idAsignacionPeriferico;
-        document.getElementById("fecha_asignacion").value = button.dataset.fechaAsignacion;
-        document.getElementById("observaciones").value = button.dataset.observaciones;
+    // Auto-hide error messages
+    const mensajeError = document.getElementById("mensajeError");
+    const mensajeExito = document.getElementById("mensajeExito");
+    
+    if (mensajeError) {
+        setTimeout(() => {
+            mensajeError.style.display = "none";
+        }, 10000);
         
-        // Seleccionar persona
-        const personaSelect = document.getElementById("persona");
-        for (let i = 0; i < personaSelect.options.length; i++) {
-            if (personaSelect.options[i].value === button.dataset.idPersona) {
-                personaSelect.selectedIndex = i;
-                break;
-            }
+        // Limpiar parámetro de la URL
+        if (history.replaceState) {
+            const url = new URL(window.location);
+            url.searchParams.delete('error');
+            url.searchParams.delete('message');
+            window.history.replaceState({}, document.title, url.pathname + url.search);
         }
-        
-        // Seleccionar periférico
-        const perifericoSelect = document.getElementById("periferico");
-        for (let i = 0; i < perifericoSelect.options.length; i++) {
-            if (perifericoSelect.options[i].value === button.dataset.idPeriferico) {
-                perifericoSelect.selectedIndex = i;
-                break;
-            }
-        }
-        
-        // Mostrar el modal
-        document.getElementById("modalAsignacionPeriferico").style.display = "block";
-    });
+    }
+    
+    if (mensajeExito) {
+        setTimeout(() => {
+            mensajeExito.style.display = "none";
+        }, 5000);
+    }
+
+    console.log("Sistema de gestión de asignaciones de periféricos cargado correctamente");
 });

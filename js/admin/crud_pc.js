@@ -764,6 +764,18 @@ document.addEventListener("DOMContentLoaded", function () {
                         case 'estado':
                             element.textContent = valor;
                             element.setAttribute('data-estado', valor);
+                            
+                            // Aplicar clase CSS según el estado
+                            element.className = 'estado-celda';
+                            if (valor.toLowerCase() === 'disponible') {
+                                element.classList.add('estado-disponible');
+                            } else if (valor.toLowerCase() === 'asignado') {
+                                element.classList.add('estado-asignado');
+                            } else if (valor.toLowerCase() === 'malogrado') {
+                                element.classList.add('estado-malogrado');
+                            } else if (valor.toLowerCase() === 'almacen') {
+                                element.classList.add('estado-almacen');
+                            }
                             continue;
                         case 'observaciones':
                             const observacionesElement = document.getElementById('view-observaciones');

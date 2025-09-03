@@ -245,6 +245,25 @@ $activos = $filas_temp;
             }
             
             foreach ($activos as $a) { 
+                $estado_clase = '';
+                // Determinar la clase CSS según el estado
+                if (isset($a['estado'])) {
+                    switch(strtolower($a['estado'])) {
+                        case 'disponible':
+                            $estado_clase = 'estado-disponible';
+                            break;
+                        case 'asignado':
+                            $estado_clase = 'estado-asignado';
+                            break;
+                        case 'malogrado':
+                            $estado_clase = 'estado-malogrado';
+                            break;
+                        case 'almacen':
+                            $estado_clase = 'estado-almacen';
+                            break;
+                    }
+                }
+                
                 // Manejar fechas
                 $fecha_compra = "";
                 $fecha_garantia = "";
@@ -265,7 +284,7 @@ $activos = $filas_temp;
                     }
                 }
             ?>
-            <tr>
+            <tr class="<?= $estado_clase ?>">
                 <td><?= $counter++ ?></td>
                 <td><?= htmlspecialchars($a['nombreEquipo'] ?? '') ?></td>
                 <td><?= htmlspecialchars($a['modelo'] ?? '') ?></td>

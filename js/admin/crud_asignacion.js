@@ -45,6 +45,19 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
+    // --- cerrar modal al hacer click fuera ---
+    window.onclick = function (event) {
+        if (event.target == modalAsignacion) {
+            modalAsignacion.style.display = "none";
+        }
+        if (event.target == modalRetorno) {
+            modalRetorno.style.display = "none";
+        }
+        if (event.target == modalView) {
+            modalView.style.display = "none";
+        }
+    }
+
     // --- botones ver ---
     document.querySelectorAll(".btn-ver").forEach(function (btn) {
         btn.addEventListener("click", function () {
@@ -426,6 +439,17 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
 
-    console.log("Sistema de gestión de asignaciones cargado correctamente");
+    // --- mensajes de éxito/error ---
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('success')) {
+        // Limpiar parámetro de la URL
+        if (history.replaceState) {
+            const url = new URL(window.location);
+            url.searchParams.delete('success');
+            window.history.replaceState({}, document.title, url.pathname + url.search);
+        }
+    }
+
+    console.log("✅ Sistema de gestión de asignaciones cargado correctamente");
 });
 

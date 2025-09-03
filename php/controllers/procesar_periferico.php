@@ -7,18 +7,24 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $id_tipo_periferico = $_POST["id_tipo_periferico"] ?? '';
     $id_marca = $_POST["id_marca"] ?? '';
     $id_condicion = $_POST["id_condicion_periferico"] ?? '';
+    $id_estado = $_POST["id_estado_periferico"] ?? '';
+    $nombre_periferico = $_POST["nombre_periferico"] ?? '';
+    $numero_serie = $_POST["numero_serie"] ?? '';
+    $modelo = $_POST["modelo"] ?? '';
+    $fecha_adquisicion = $_POST["fecha_adquisicion"] ?? '';
+    $costo = $_POST["costo"] ?? '';
 
     try {
         if ($accion === "crear") {
-            $sql = "INSERT INTO periferico (id_tipo_periferico, id_marca, id_condicion_periferico) VALUES (?, ?, ?)";
-            $params = [$id_tipo_periferico, $id_marca, $id_condicion];
+            $sql = "INSERT INTO periferico (id_tipo_periferico, id_marca, id_condicion_periferico, id_estado_periferico, nombre_periferico, numero_serie, modelo, fecha_adquisicion, costo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $params = [$id_tipo_periferico, $id_marca, $id_condicion, $id_estado, $nombre_periferico, $numero_serie, $modelo, $fecha_adquisicion ?: null, $costo ?: null];
             $stmt = sqlsrv_query($conn, $sql, $params);
 
         } elseif ($accion === "editar" && !empty($id_periferico)) {
             $sql = "UPDATE periferico 
-                    SET id_tipo_periferico = ?, id_marca = ?, id_condicion_periferico = ?
+                    SET id_tipo_periferico = ?, id_marca = ?, id_condicion_periferico = ?, id_estado_periferico = ?, nombre_periferico = ?, numero_serie = ?, modelo = ?, fecha_adquisicion = ?, costo = ?
                     WHERE id_periferico = ?";
-            $params = [$id_tipo_periferico, $id_marca, $id_condicion, $id_periferico];
+            $params = [$id_tipo_periferico, $id_marca, $id_condicion, $id_estado, $nombre_periferico, $numero_serie, $modelo, $fecha_adquisicion ?: null, $costo ?: null, $id_periferico];
             $stmt = sqlsrv_query($conn, $sql, $params);
 
         } elseif ($accion === "eliminar" && !empty($id_periferico)) {

@@ -122,6 +122,12 @@ document.addEventListener("DOMContentLoaded", function () {
             setTimeout(() => {
                 marcaSelect.value = btn.dataset.idMarca;
                 document.getElementById("id_condicion_periferico").value = btn.dataset.idCondicion;
+                document.getElementById("id_estado_periferico").value = btn.dataset.idEstado;
+                document.getElementById("nombre_periferico").value = btn.dataset.nombre;
+                document.getElementById("numero_serie").value = btn.dataset.numeroSerie;
+                document.getElementById("modelo").value = btn.dataset.modelo;
+                document.getElementById("fecha_adquisicion").value = btn.dataset.fechaAdquisicion;
+                document.getElementById("costo").value = btn.dataset.costo;
             }, 100);
 
             modal.style.display = "block";
