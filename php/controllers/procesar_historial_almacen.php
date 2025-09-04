@@ -137,6 +137,116 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             header("Location: ../views/crud_historial_almacen.php?success=salida");
             exit;
 
+        } elseif ($accion === "editar") {
+            $id_historial = $_POST["id_historial"] ?? '';
+            $id_activo = $_POST["id_activo"] ?? '';
+            $id_almacen = $_POST["id_almacen"] ?? '';
+            $fecha_ingreso = $_POST["fecha_ingreso"] ?? '';
+            $fecha_salida = $_POST["fecha_salida"] ?? null;
+            $observaciones = trim($_POST["observaciones"] ?? '');
+
+            // Validaciones
+            if (empty($id_historial) || empty($id_activo) || empty($id_almacen) || empty($fecha_ingreso)) {
+                throw new Exception("Todos los campos obligatorios deben ser completados.");
+            }
+
+            // Validar fechas
+            if ($fecha_salida && $fecha_salida < $fecha_ingreso) {
+                throw new Exception("La fecha de salida no puede ser anterior a la fecha de ingreso.");
+            }
+
+            // Limpiar fecha_salida si está vacía
+            if (empty($fecha_salida)) {
+                $fecha_salida = null;
+            }
+
+            // Obtener información actual del registro
+            $sql_get_current = "SELECT id_activo, fecha_salida FROM historial_almacen WHERE id_historial = ?";
+            $stmt_get_current = sqlsrv_query($conn, $sql_get_current, [$id_historial]);
+            $current_data = sqlsrv_fetch_array($stmt_get_current);
+            
+            if (!$current_data) {
+                throw new Exception("Registro de historial no encontrado.");
+            }
+
+            $activo_anterior = $current_data['id_activo'];
+            $tenia_fecha_salida = $current_data['fecha_salida'] !== null;
+
+            sqlsrv_begin_transaction($conn);
+            
+            // Actualizar el registro
+            $sql_update = "UPDATE historial_almacen SET 
+                          id_activo = ?, 
+                          id_almacen = ?, 
+                          fecha_ingreso = ?, 
+                          fecha_salida = ?, 
+                          observaciones = ? 
+                          WHERE id_historial = ?";
+            
+            $stmt_update = sqlsrv_query($conn, $sql_update, [
+                $id_activo, 
+                $id_almacen, 
+                $fecha_ingreso, 
+                $fecha_salida, 
+                $observaciones, 
+                $id_historial
+            ]);
+
+            if ($stmt_update === false) {
+                throw new Exception("Error al actualizar registro del historial");
+            }
+
+            // Actualizar estados de activos si es necesario
+            
+            // Si cambió el activo, restaurar el estado del activo anterior
+            if ($activo_anterior != $id_activo) {
+                if (!$tenia_fecha_salida) {
+                    // El activo anterior estaba en almacén, ponerlo disponible
+                    $sql_restore_anterior = "
+                        UPDATE laptop SET id_estado_activo = (SELECT id_estado_activo FROM estado_activo WHERE vestado_activo = 'Disponible') 
+                        WHERE id_laptop = (SELECT id_laptop FROM activo WHERE id_activo = ? AND tipo_activo = 'Laptop');
+                        
+                        UPDATE pc SET id_estado_activo = (SELECT id_estado_activo FROM estado_activo WHERE vestado_activo = 'Disponible') 
+                        WHERE id_pc = (SELECT id_pc FROM activo WHERE id_activo = ? AND tipo_activo = 'PC');
+                        
+                        UPDATE servidor SET id_estado_activo = (SELECT id_estado_activo FROM estado_activo WHERE vestado_activo = 'Disponible') 
+                        WHERE id_servidor = (SELECT id_servidor FROM activo WHERE id_activo = ? AND tipo_activo = 'Servidor');
+                    ";
+                    
+                    $stmts = explode(';', $sql_restore_anterior);
+                    foreach ($stmts as $stmt_sql) {
+                        if (trim($stmt_sql)) {
+                            sqlsrv_query($conn, trim($stmt_sql), [$activo_anterior]);
+                        }
+                    }
+                }
+            }
+
+            // Actualizar estado del activo actual según si tiene fecha de salida o no
+            $estado_activo = ($fecha_salida === null) ? 'Almacen' : 'Disponible';
+            
+            $sql_update_actual = "
+                UPDATE laptop SET id_estado_activo = (SELECT id_estado_activo FROM estado_activo WHERE vestado_activo = ?) 
+                WHERE id_laptop = (SELECT id_laptop FROM activo WHERE id_activo = ? AND tipo_activo = 'Laptop');
+                
+                UPDATE pc SET id_estado_activo = (SELECT id_estado_activo FROM estado_activo WHERE vestado_activo = ?) 
+                WHERE id_pc = (SELECT id_pc FROM activo WHERE id_activo = ? AND tipo_activo = 'PC');
+                
+                UPDATE servidor SET id_estado_activo = (SELECT id_estado_activo FROM estado_activo WHERE vestado_activo = ?) 
+                WHERE id_servidor = (SELECT id_servidor FROM activo WHERE id_activo = ? AND tipo_activo = 'Servidor');
+            ";
+            
+            $stmts = explode(';', $sql_update_actual);
+            foreach ($stmts as $stmt_sql) {
+                if (trim($stmt_sql)) {
+                    sqlsrv_query($conn, trim($stmt_sql), [$estado_activo, $id_activo]);
+                }
+            }
+
+            sqlsrv_commit($conn);
+            header("Location: ../views/crud_historial_almacen.php?success=editado");
+            exit;
+
         } elseif ($accion === "eliminar") {
             $id_historial = $_POST["id_historial"] ?? '';
 

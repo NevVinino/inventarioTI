@@ -12,6 +12,14 @@ $sqlAsignacionesPerifericos = "SELECT
     ap.fecha_retorno,
     ap.observaciones,
     CONCAT(p.nombre, ' ', p.apellido) as nombre_persona,
+    p.correo as email,
+    p.celular as telefono,
+    l.localidad_nombre,
+    a.nombre as area_nombre,
+    e.nombre as empresa_nombre,
+    sp.situacion as situacion_personal,
+    tp_persona.nombre_tipo_persona,
+    CONCAT(jefe.nombre, ' ', jefe.apellido) as jefe_inmediato,
     tp.vtipo_periferico,
     m.nombre as marca_nombre,
     per.nombre_periferico,
@@ -21,6 +29,12 @@ $sqlAsignacionesPerifericos = "SELECT
     cp.vcondicion_periferico
     FROM asignacion_periferico ap
     INNER JOIN persona p ON ap.id_persona = p.id_persona
+    LEFT JOIN localidad l ON p.id_localidad = l.id_localidad
+    LEFT JOIN area a ON p.id_area = a.id_area
+    LEFT JOIN empresa e ON p.id_empresa = e.id_empresa
+    LEFT JOIN situacion_personal sp ON p.id_situacion_personal = sp.id_situacion
+    LEFT JOIN tipo_persona tp_persona ON p.id_tipo_persona = tp_persona.id_tipo_persona
+    LEFT JOIN persona jefe ON p.jefe_inmediato = jefe.id_persona
     INNER JOIN periferico per ON ap.id_periferico = per.id_periferico
     INNER JOIN tipo_periferico tp ON per.id_tipo_periferico = tp.id_tipo_periferico
     INNER JOIN marca m ON per.id_marca = m.id_marca
@@ -62,43 +76,6 @@ $perifericos = sqlsrv_query($conn, $sqlPerifericos);
     <meta charset="UTF-8">
     <title>Gestión de Asignaciones de Periféricos</title>
     <link rel="stylesheet" href="../../css/admin/admin_main.css">
-    <style>
-        .alerta-error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-            padding: 12px 20px;
-            margin: 20px auto;
-            width: 80%;
-            text-align: center;
-            border-radius: 5px;
-            font-weight: bold;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            transition: opacity 0.5s ease;
-        }
-        
-        .alerta-exito {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-            padding: 12px 20px;
-            margin: 20px auto;
-            width: 80%;
-            text-align: center;
-            border-radius: 5px;
-            font-weight: bold;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            transition: opacity 0.5s ease;
-        }
-
-        .estado-asignado {
-            background-color: #d1e7dd;
-        }
-
-        .estado-disponible {
-            background-color: #f8d7da;
-        }
-    </style>
 </head>
 
 <body>
@@ -164,6 +141,11 @@ $perifericos = sqlsrv_query($conn, $sqlPerifericos);
                     // Determinar estado y clase CSS
                     $estado_asignacion = $ap['fecha_retorno'] ? 'Retornado' : 'Activo';
                     $estado_clase = $estado_asignacion === 'Activo' ? 'estado-asignado' : 'estado-disponible';
+                    
+                    // Formatear fechas
+                    $fecha_asignacion = $ap['fecha_asignacion'] ? $ap['fecha_asignacion']->format('d/m/Y') : '-';
+                    $fecha_retorno = $ap['fecha_retorno'] ? $ap['fecha_retorno']->format('d/m/Y') : 'Activa';
+                    $fecha_asignacion_input = $ap['fecha_asignacion'] ? $ap['fecha_asignacion']->format('Y-m-d') : '';
                 ?>
                 <tr class="<?= $estado_clase ?>">
                     <td><?= $counter++ ?></td>
@@ -173,17 +155,44 @@ $perifericos = sqlsrv_query($conn, $sqlPerifericos);
                     <td><?= htmlspecialchars($ap['modelo'] ?? $ap['nombre_periferico'] ?? '-') ?></td>
                     <td><?= htmlspecialchars($ap['numero_serie'] ?? '-') ?></td>
                     <td><?= htmlspecialchars($ap['vestado_periferico']) ?></td>
-                    <td><?= $ap['fecha_asignacion'] ? $ap['fecha_asignacion']->format('d/m/Y') : '-' ?></td>
-                    <td><?= $ap['fecha_retorno'] ? $ap['fecha_retorno']->format('d/m/Y') : 'Activa' ?></td>
+                    <td><?= $fecha_asignacion ?></td>
+                    <td><?= $fecha_retorno ?></td>
                     <td>
                         <div class="acciones">
+                            <!-- Botón ver detalles -->
+                            <button type="button" class="btn-icon btn-ver" 
+                                data-persona="<?= htmlspecialchars($ap['nombre_persona']) ?>"
+                                data-email="<?= htmlspecialchars($ap['email'] ?? 'Sin email') ?>"
+                                data-telefono="<?= htmlspecialchars($ap['telefono'] ?? 'Sin teléfono') ?>"
+                                data-localidad="<?= htmlspecialchars($ap['localidad_nombre'] ?? 'Sin localidad') ?>"
+                                data-area="<?= htmlspecialchars($ap['area_nombre'] ?? 'Sin área') ?>"
+                                data-empresa="<?= htmlspecialchars($ap['empresa_nombre'] ?? 'Sin empresa') ?>"
+                                data-situacion="<?= htmlspecialchars($ap['situacion_personal'] ?? 'Sin situación') ?>"
+                                data-tipo-persona="<?= htmlspecialchars($ap['nombre_tipo_persona'] ?? 'Sin tipo') ?>"
+                                data-jefe="<?= htmlspecialchars($ap['jefe_inmediato'] ?? 'Sin jefe inmediato') ?>"
+                                data-tipo-periferico="<?= htmlspecialchars($ap['vtipo_periferico']) ?>"
+                                data-marca="<?= htmlspecialchars($ap['marca_nombre']) ?>"
+                                data-modelo="<?= htmlspecialchars($ap['modelo'] ?? '') ?>"
+                                data-nombre-periferico="<?= htmlspecialchars($ap['nombre_periferico'] ?? '') ?>"
+                                data-numero-serie="<?= htmlspecialchars($ap['numero_serie'] ?? '') ?>"
+                                data-estado-periferico="<?= htmlspecialchars($ap['vestado_periferico']) ?>"
+                                data-condicion="<?= htmlspecialchars($ap['vcondicion_periferico'] ?? '') ?>"
+                                data-fecha-asignacion="<?= $fecha_asignacion ?>"
+                                data-fecha-retorno="<?= $fecha_retorno === 'Activa' ? 'Pendiente' : $fecha_retorno ?>"
+                                data-estado="<?= $estado_asignacion ?>"
+                                data-observaciones="<?= htmlspecialchars($ap['observaciones'] ?? '') ?>"
+                                title="Ver detalles"
+                            >
+                                <img src="../../img/ojo.png" alt="Ver">
+                            </button>
+
                             <?php if ($estado_asignacion === 'Activo'): ?>
                                 <!-- Botón editar (solo para asignaciones activas) -->
                                 <button type="button" class="btn-icon btn-editar"
                                     data-id-asignacion-periferico="<?= $ap['id_asignacion_periferico'] ?>"
                                     data-id-persona="<?= $ap['id_persona'] ?>"
                                     data-id-periferico="<?= $ap['id_periferico'] ?>"
-                                    data-fecha-asignacion="<?= $ap['fecha_asignacion'] ? $ap['fecha_asignacion']->format('Y-m-d') : '' ?>"
+                                    data-fecha-asignacion="<?= $fecha_asignacion_input ?>"
                                     data-observaciones="<?= htmlspecialchars($ap['observaciones'] ?? '') ?>">
                                     <img src="../../img/editar.png" alt="Editar">
                                 </button>
@@ -199,13 +208,15 @@ $perifericos = sqlsrv_query($conn, $sqlPerifericos);
                             <?php endif; ?>
 
                             <!-- Botón eliminar (para todas las asignaciones) -->
-                            <form method="POST" action="../controllers/procesar_asignacionPeriferico.php" style="display:inline;" onsubmit="return confirm('¿Eliminar esta asignación de periférico?');">
-                                <input type="hidden" name="accion" value="eliminar">
-                                <input type="hidden" name="id_asignacion_periferico" value="<?= $ap['id_asignacion_periferico'] ?>">
-                                <button type="submit" class="btn-icon">
-                                    <img src="../../img/eliminar.png" alt="Eliminar">
-                                </button>
-                            </form>
+                            <button type="button" class="btn-icon btn-eliminar"
+                                data-id="<?= $ap['id_asignacion_periferico'] ?>"
+                                data-persona="<?= htmlspecialchars($ap['nombre_persona']) ?>"
+                                data-periferico="<?= htmlspecialchars($ap['vtipo_periferico'] . ' - ' . $ap['marca_nombre'] . ' ' . ($ap['modelo'] ?? $ap['nombre_periferico'] ?? '')) ?>"
+                                data-estado="<?= $estado_asignacion ?>"
+                                title="Eliminar asignación"
+                            >
+                                <img src="../../img/eliminar.png" alt="Eliminar">
+                            </button>
                         </div>
                     </td>
                 </tr>
@@ -294,6 +305,119 @@ $perifericos = sqlsrv_query($conn, $sqlPerifericos);
                 <br>
                 <button type="submit">Registrar Retorno</button>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal para ver detalles -->
+    <div id="modalVisualizacion" class="modal">
+        <div class="modal-content detalles">
+            <span class="close close-view">&times;</span>
+            <h3>Detalles Completos de la Asignación de Periférico</h3>
+            
+            <div class="detalles-grid">
+                <!-- Sección: Información de la Persona -->
+                <div class="seccion-detalles">
+                    <h4>👤 Información de la Persona</h4>
+                    <div class="detalle-item">
+                        <strong>Nombre Completo:</strong>
+                        <span id="view-persona"></span>
+                    </div>
+                    <div class="detalle-item">
+                        <strong>Email:</strong>
+                        <span id="view-email"></span>
+                    </div>
+                    <div class="detalle-item">
+                        <strong>Teléfono:</strong>
+                        <span id="view-telefono"></span>
+                    </div>
+                    <div class="detalle-item">
+                        <strong>Localidad:</strong>
+                        <span id="view-localidad"></span>
+                    </div>
+                    <div class="detalle-item">
+                        <strong>Área:</strong>
+                        <span id="view-area"></span>
+                    </div>
+                    <div class="detalle-item">
+                        <strong>Empresa:</strong>
+                        <span id="view-empresa"></span>
+                    </div>
+                    <div class="detalle-item">
+                        <strong>Situación Personal:</strong>
+                        <span id="view-situacion"></span>
+                    </div>
+                    <div class="detalle-item">
+                        <strong>Tipo de Persona:</strong>
+                        <span id="view-tipo-persona"></span>
+                    </div>
+                    <div class="detalle-item">
+                        <strong>Jefe Inmediato:</strong>
+                        <span id="view-jefe"></span>
+                    </div>
+                </div>
+
+                <!-- Sección: Información del Periférico -->
+                <div class="seccion-detalles">
+                    <h4>🖱️ Información del Periférico</h4>
+                    <div class="detalle-item">
+                        <strong>Tipo de Periférico:</strong>
+                        <span id="view-tipo-periferico"></span>
+                    </div>
+                    <div class="detalle-item">
+                        <strong>Marca:</strong>
+                        <span id="view-marca"></span>
+                    </div>
+                    <div class="detalle-item">
+                        <strong>Modelo:</strong>
+                        <span id="view-modelo"></span>
+                    </div>
+                    <div class="detalle-item">
+                        <strong>Nombre del Periférico:</strong>
+                        <span id="view-nombre-periferico"></span>
+                    </div>
+                    <div class="detalle-item">
+                        <strong>Número de Serie:</strong>
+                        <span id="view-numero-serie"></span>
+                    </div>
+                    <div class="detalle-item">
+                        <strong>Estado:</strong>
+                        <span id="view-estado-periferico"></span>
+                    </div>
+                    <div class="detalle-item">
+                        <strong>Condición:</strong>
+                        <span id="view-condicion"></span>
+                    </div>
+                </div>
+
+                <!-- Sección: Información de la Asignación -->
+                <div class="seccion-detalles">
+                    <h4>📅 Información de la Asignación</h4>
+                    <div class="detalle-item">
+                        <strong>Fecha de Asignación:</strong>
+                        <span id="view-fecha-asignacion"></span>
+                    </div>
+                    <div class="detalle-item">
+                        <strong>Fecha de Retorno:</strong>
+                        <span id="view-fecha-retorno"></span>
+                    </div>
+                    <div class="detalle-item">
+                        <strong>Estado Actual:</strong>
+                        <span id="view-estado"></span>
+                    </div>
+                    <div class="detalle-item">
+                        <strong>Duración de la Asignación:</strong>
+                        <span id="view-duracion"></span>
+                    </div>
+                </div>
+                
+                <!-- Observaciones -->
+                <div class="seccion-detalles ">
+                    <h4>📝 Observaciones</h4>
+                    <div class="detalle-item observaciones-item">
+                        <div id="view-observaciones" class="observaciones-texto"></div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

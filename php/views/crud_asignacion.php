@@ -339,7 +339,7 @@ while ($fila = sqlsrv_fetch_array($asignaciones, SQLSRV_FETCH_ASSOC)) {
             <input type="hidden" name="id_asignacion" id="retorno_id_asignacion">
             
             <div class="info-asignacion">
-                <p><strong>Persona:</strong> <span id="retorno_persona"></span></p>
+                <p><strong>Persona:</strong> <span id="retorno_persona"></span></p><div class="acciones">
                 <p><strong>Activo:</strong> <span id="retorno_activo"></span></p>
             </div>
 

@@ -2,9 +2,11 @@ document.addEventListener("DOMContentLoaded", function () {
     // --- elementos principales ---
     const modalIngreso = document.getElementById("modalIngreso");
     const modalSalida = document.getElementById("modalSalida");
+    const modalEditar = document.getElementById("modalEditar");
     const btnIngresar = document.getElementById("btnIngresar");
     const formIngreso = document.getElementById("formIngreso");
     const formSalida = document.getElementById("formSalida");
+    const formEditar = document.getElementById("formEditar");
     const buscador = document.getElementById("buscador");
 
     // --- abrir modal ingreso ---
@@ -27,6 +29,7 @@ document.addEventListener("DOMContentLoaded", function () {
         closeBtn.addEventListener("click", function() {
             if (modalIngreso) modalIngreso.style.display = "none";
             if (modalSalida) modalSalida.style.display = "none";
+            if (modalEditar) modalEditar.style.display = "none";
         });
     });
 
@@ -38,7 +41,33 @@ document.addEventListener("DOMContentLoaded", function () {
         if (event.target == modalSalida) {
             modalSalida.style.display = "none";
         }
+        if (event.target == modalEditar) {
+            modalEditar.style.display = "none";
+        }
     };
+
+    // --- botones editar ---
+    document.querySelectorAll(".btn-editar").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            if (!modalEditar) return;
+
+            const idHistorial = this.dataset.id;
+            const idActivo = this.dataset.activo;
+            const idAlmacen = this.dataset.almacen;
+            const fechaIngreso = this.dataset.fechaIngreso;
+            const fechaSalida = this.dataset.fechaSalida;
+            const observaciones = this.dataset.observaciones;
+
+            document.getElementById("editar_id_historial").value = idHistorial;
+            document.getElementById("editar_id_activo").value = idActivo;
+            document.getElementById("editar_id_almacen").value = idAlmacen;
+            document.getElementById("editar_fecha_ingreso").value = fechaIngreso;
+            document.getElementById("editar_fecha_salida").value = fechaSalida || '';
+            document.getElementById("editar_observaciones").value = observaciones || '';
+
+            modalEditar.style.display = "block";
+        });
+    });
 
     // --- botones salida ---
     document.querySelectorAll(".btn-salida").forEach(function (btn) {
@@ -125,20 +154,60 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
+    // --- validación formulario editar ---
+    if (formEditar) {
+        formEditar.addEventListener("submit", function(event) {
+            const activo = document.getElementById("editar_id_activo").value;
+            const almacen = document.getElementById("editar_id_almacen").value;
+            const fechaIngreso = document.getElementById("editar_fecha_ingreso").value;
+            const fechaSalida = document.getElementById("editar_fecha_salida").value;
+
+            if (!activo || !almacen || !fechaIngreso) {
+                event.preventDefault();
+                alert("Los campos activo, almacén y fecha de ingreso son obligatorios.");
+                return false;
+            }
+
+            const hoy = new Date().toISOString().split('T')[0];
+            if (fechaIngreso > hoy) {
+                event.preventDefault();
+                alert("La fecha de ingreso no puede ser posterior a hoy.");
+                return false;
+            }
+
+            if (fechaSalida && fechaSalida > hoy) {
+                event.preventDefault();
+                alert("La fecha de salida no puede ser posterior a hoy.");
+                return false;
+            }
+
+            if (fechaSalida && fechaSalida < fechaIngreso) {
+                event.preventDefault();
+                alert("La fecha de salida no puede ser anterior a la fecha de ingreso.");
+                return false;
+            }
+
+            if (!confirm("¿Confirma la actualización de este registro?")) {
+                event.preventDefault();
+                return false;
+            }
+        });
+    }
+
     // --- auto-hide mensajes ---
-    const mensajeExito = document.querySelector(".mensaje-exito");
+    const alertaExito = document.querySelector(".alerta-exito");
     const mensajeError = document.querySelector(".mensaje-error");
     
-    if (mensajeExito) {
+    if (alertaExito) {
         setTimeout(() => {
-            mensajeExito.style.display = "none";
-        }, 5000);
+            alertaExito.style.display = "none";
+        }, 2000); // 2 segundos para alertas de éxito
     }
     
     if (mensajeError) {
         setTimeout(() => {
             mensajeError.style.display = "none";
-        }, 8000);
+        }, 8000); // 8 segundos para mensajes de error (se mantiene)
     }
 
     // --- limpiar parámetros URL ---

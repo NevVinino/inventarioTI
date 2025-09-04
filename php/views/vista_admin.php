@@ -56,7 +56,8 @@ include("../includes/verificar_acceso.php");
                 <td><a href="crud_tipo_periferico.php"><img src="../../img/tenor.gif"><p>Crear Tipo de Periférico</p></a></td>
                 <td><a href="crud_asignacion.php"><img src="../../img/tenor.gif"><p>Asignaciones Activos</p></a></td>
                 <td><a href="crud_asignacionPeriferico.php"><img src="../../img/tenor.gif"><p>Asignaciones Perifericos</p></a></td>
-                
+                <td><a href="crud_reparacion.php"><img src="../../img/tenor.gif"><p>Asignaciones Reparaciones</p></a></td>
+
             </tr>
 
             <tr>

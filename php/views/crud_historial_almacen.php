@@ -122,16 +122,18 @@ while ($fila = sqlsrv_fetch_array($historial, SQLSRV_FETCH_ASSOC)) {
 
 <!-- Mensajes de estado -->
 <?php if (isset($_GET['success'])): ?>
-    <div class="mensaje-exito">
+    <div class="alerta-exito">
         <?php 
         switch($_GET['success']) {
             case 'ingreso': echo 'Activo ingresado al almacén correctamente.'; break;
             case 'salida': echo 'Salida del almacén registrada correctamente.'; break;
+            case 'editado': echo 'Registro actualizado correctamente.'; break;
             case 'eliminado': echo 'Registro eliminado correctamente.'; break;
             default: echo 'Operación realizada correctamente.'; break;
         }
         ?>
     </div>
+
 <?php endif; ?>
 
 <?php if (isset($_GET['error'])): ?>
@@ -189,6 +191,18 @@ while ($fila = sqlsrv_fetch_array($historial, SQLSRV_FETCH_ASSOC)) {
                 <td class="estado-celda"><?= $estado_movimiento ?></td>
                 <td>
                     <div class="acciones">
+                        <!-- Botón editar -->
+                        <button type="button" class="btn-icon btn-editar"
+                            data-id="<?= htmlspecialchars($h['id_historial']) ?>"
+                            data-activo="<?= htmlspecialchars($h['id_activo']) ?>"
+                            data-almacen="<?= htmlspecialchars($h['id_almacen']) ?>"
+                            data-fecha-ingreso="<?= $h['fecha_ingreso'] ? $h['fecha_ingreso']->format('Y-m-d') : '' ?>"
+                            data-fecha-salida="<?= $h['fecha_salida'] ? $h['fecha_salida']->format('Y-m-d') : '' ?>"
+                            data-observaciones="<?= htmlspecialchars($h['observaciones'] ?? '') ?>"
+                            title="Editar registro">
+                            <img src="../../img/editar.png" alt="Editar">
+                        </button>
+
                         <?php if ($estado_movimiento === 'En Almacén'): ?>
                             <!-- Botón registrar salida -->
                             <button type="button" class="btn-icon btn-salida"
@@ -288,6 +302,71 @@ while ($fila = sqlsrv_fetch_array($historial, SQLSRV_FETCH_ASSOC)) {
 
             <br>
             <button type="submit">Registrar Salida</button>
+        </form>
+    </div>
+</div>
+
+<!-- Modal para editar registro -->
+<div id="modalEditar" class="modal" style="display:none;">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h3>Editar Registro de Almacén</h3>
+        
+        <form id="formEditar" method="POST" action="../controllers/procesar_historial_almacen.php">
+            <input type="hidden" name="accion" value="editar">
+            <input type="hidden" name="id_historial" id="editar_id_historial">
+            
+            <label>Activo:</label>
+            <select name="id_activo" id="editar_id_activo" required>
+                <option value="">Seleccione un activo...</option>
+                <?php 
+                // Consulta para todos los activos para el modal de edición
+                $sql_todos_activos = "
+                SELECT DISTINCT
+                    a.id_activo,
+                    CASE 
+                        WHEN a.tipo_activo = 'Laptop' THEN CONCAT('Laptop - ', l.nombreEquipo, ' (', l.numeroSerial, ')')
+                        WHEN a.tipo_activo = 'PC' THEN CONCAT('PC - ', p.nombreEquipo, ' (', p.numeroSerial, ')')
+                        WHEN a.tipo_activo = 'Servidor' THEN CONCAT('Servidor - ', s.nombreEquipo, ' (', s.numeroSerial, ')')
+                    END as descripcion_activo
+                FROM activo a
+                LEFT JOIN laptop l ON a.id_laptop = l.id_laptop
+                LEFT JOIN pc p ON a.id_pc = p.id_pc
+                LEFT JOIN servidor s ON a.id_servidor = s.id_servidor
+                ORDER BY descripcion_activo";
+                
+                $todos_activos = sqlsrv_query($conn, $sql_todos_activos);
+                while ($activo = sqlsrv_fetch_array($todos_activos, SQLSRV_FETCH_ASSOC)): ?>
+                    <option value="<?= $activo['id_activo'] ?>">
+                        <?= htmlspecialchars($activo['descripcion_activo']) ?>
+                    </option>
+                <?php endwhile; ?>
+            </select>
+
+            <label>Almacén:</label>
+            <select name="id_almacen" id="editar_id_almacen" required>
+                <option value="">Seleccione un almacén...</option>
+                <?php 
+                $almacenes_edit = sqlsrv_query($conn, "SELECT id_almacen, nombre FROM almacen ORDER BY nombre");
+                while ($almacen = sqlsrv_fetch_array($almacenes_edit, SQLSRV_FETCH_ASSOC)): ?>
+                    <option value="<?= $almacen['id_almacen'] ?>">
+                        <?= htmlspecialchars($almacen['nombre']) ?>
+                    </option>
+                <?php endwhile; ?>
+            </select>
+
+            <label>Fecha de Ingreso:</label>
+            <input type="date" name="fecha_ingreso" id="editar_fecha_ingreso" required>
+
+            <label>Fecha de Salida:</label>
+            <input type="date" name="fecha_salida" id="editar_fecha_salida">
+
+            <label>Observaciones:</label>
+            <textarea name="observaciones" id="editar_observaciones" rows="4" 
+                      placeholder="Observaciones del registro..."></textarea>
+
+            <br>
+            <button type="submit">Actualizar Registro</button>
         </form>
     </div>
 </div>

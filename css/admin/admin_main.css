@@ -3,7 +3,7 @@
 /* Configuración base del body */
 body {
     font-family: 'Segoe UI', Arial, sans-serif; /* Fuente moderna y legible */
-    background-color: #f4f6f8; /* Color de fondo gris claro */
+    background-color: #d9dbde; /* Color de fondo gris claro #f4f6f8*/ 
     margin: 0; /* Eliminar márgenes por defecto */
     padding: 0; /* Eliminar padding por defecto */
     font-size: 20px; /* 👈 Cambiar aquí el tamaño base de todas las letras */
@@ -243,8 +243,8 @@ table:not(.contenedor-tabla table) tr:last-child td:last-child {
     max-width: 300px; /* Ancho máximo */
 }
 
-/* Botón "Nuevo" */
-#btnNuevo {
+/* Botón "Nuevo" y "Ingresar Almacen"*/
+#btnNuevo, #btnIngresar {
     background-color: #3498db; /* Color azul */
     color: white; /* Texto blanco */
     padding: 8px 18px; /* Espaciado interno */
@@ -254,6 +254,7 @@ table:not(.contenedor-tabla table) tr:last-child td:last-child {
     cursor: pointer; /* Cursor de mano */
     transition: background-color 0.3s ease; /* Animación suave */
 }
+
 
 /* Efecto hover para botón nuevo */
 #btnNuevo:hover {
@@ -274,6 +275,9 @@ table:not(.contenedor-tabla table) tr:last-child td:last-child {
     background-color: rgba(220, 53, 69, 0.1) !important; /* Rojo claro transparente */
 }
 
+.estado-almacen {
+    background-color: rgba(55, 136, 145, 0.1) !important; /* Celeste claro transparente */
+}
 /* Colores del texto en las celdas de estado */
 .estado-disponible .estado-celda {
     color: #2d9234; /* Verde oscuro */
@@ -287,6 +291,10 @@ table:not(.contenedor-tabla table) tr:last-child td:last-child {
 
 .estado-malogrado .estado-celda {
     color: #dc3545; /* Rojo */
+    font-weight: bold; /* Negrita */
+}
+.estado-almacen .estado-celda {
+    color: #15A0D4; /* Celeste */
     font-weight: bold; /* Negrita */
 }
 
@@ -917,6 +925,11 @@ textarea#observaciones {
     font-weight: bold; /* Negrita */
 }
 
+#view-estado[data-estado="Almacen"] {
+    color: #15A0D4; /* Celeste */
+    font-weight: bold; /* Negrita */
+}
+
 /* Estados de garantía con colores específicos */
 .estado-garantia-vigente {
     color: #27ae60; /* Verde */
@@ -1000,5 +1013,264 @@ textarea#observaciones {
     #buscador {
         max-width: 100%; /* Ancho completo */
         margin-right: 0; /* Sin margen derecho */
+    }
+}
+
+/* ===== CRUD REPARACIONES - ESTILOS ESPECÍFICOS ===== */
+
+/* Contenedor de filtros para reparaciones */
+.filtros-container {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.filtros-container select,
+.filtros-container input[type="date"] {
+    flex: 1;
+    min-width: 200px;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.btn-filtro {
+    background-color: #17a2b8;
+    color: white;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+    white-space: nowrap;
+}
+
+.btn-filtro:hover {
+    background-color: #138496;
+}
+
+/* Modal específico para cambios de hardware */
+.modal-content.modal-hardware {
+    max-width: 1200px;
+    width: 95%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+/* Acciones de hardware */
+.hardware-actions {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.btn-hardware {
+    background-color: #28a745;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+}
+
+.btn-hardware:hover {
+    background-color: #218838;
+}
+
+/* Formulario de cambio de hardware */
+.form-hardware {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid #e9ecef;
+}
+
+.form-hardware h4 {
+    color: #495057;
+    margin-bottom: 15px;
+    font-size: 18px;
+}
+
+/* Filas de formulario */
+.form-row {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.form-col {
+    flex: 1;
+}
+
+.form-col label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #495057;
+}
+
+.form-col input,
+.form-col select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+/* Acciones del formulario */
+.form-actions {
+    margin-top: 15px;
+    display: flex;
+    gap: 10px;
+}
+
+.form-actions button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+}
+
+.form-actions button:first-child {
+    background-color: #007bff;
+    color: white;
+}
+
+.form-actions button:first-child:hover {
+    background-color: #0056b3;
+}
+
+.btn-cancel {
+    background-color: #6c757d !important;
+    color: white !important;
+}
+
+.btn-cancel:hover {
+    background-color: #545b62 !important;
+}
+
+/* Estados específicos para reparaciones */
+.estado-pendiente {
+    background-color: rgba(255, 193, 7, 0.1) !important;
+}
+
+.estado-en-proceso {
+    background-color: rgba(23, 162, 184, 0.1) !important;
+}
+
+.estado-finalizada {
+    background-color: rgba(40, 167, 69, 0.1) !important;
+}
+
+.estado-cancelada {
+    background-color: rgba(220, 53, 69, 0.1) !important;
+}
+
+/* Badges para estados de reparación */
+.badge {
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.bg-warning {
+    background-color: #ffc107 !important;
+    color: #000 !important;
+}
+
+.bg-info {
+    background-color: #17a2b8 !important;
+    color: #fff !important;
+}
+
+.bg-success {
+    background-color: #28a745 !important;
+    color: #fff !important;
+}
+
+.bg-danger {
+    background-color: #dc3545 !important;
+    color: #fff !important;
+}
+
+.bg-secondary {
+    background-color: #6c757d !important;
+    color: #fff !important;
+}
+
+/* Botones de acciones específicos para reparaciones */
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+    margin: 2px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-warning {
+    background-color: #ffc107;
+    color: #000;
+}
+
+.btn-warning:hover {
+    background-color: #e0a800;
+}
+
+.btn-info {
+    background-color: #17a2b8;
+    color: #fff;
+}
+
+.btn-info:hover {
+    background-color: #138496;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    color: #fff;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+}
+
+/* Responsivo para filtros */
+@media (max-width: 768px) {
+    .filtros-container {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .filtros-container select,
+    .filtros-container input[type="date"] {
+        min-width: 100%;
+    }
+    
+    .form-row {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .modal-content.modal-hardware {
+        width: 98%;
+        margin: 1% auto;
     }
 }
