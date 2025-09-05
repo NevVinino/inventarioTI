@@ -1,568 +1,1061 @@
 <?php
-// Configuración inicial para debugging
-ini_set('display_errors', 0);
-error_reporting(E_ALL);
+include("../includes/conexion.php");
 
-// Buffer de salida
-ob_start();
-
-// Función para limpiar output y enviar JSON
-function sendJsonResponse($data) {
-    ob_clean();
-    header('Content-Type: application/json');
-    echo json_encode($data);
-    exit;
-}
-
-// Función para debugging
-function logError($message) {
-    error_log("REPARACION DEBUG: " . $message);
-}
-
-try {
-    // Cambiar la ruta del archivo de conexión para que coincida con otros archivos
-    if (!file_exists('../includes/conexion.php')) {
-        sendJsonResponse(['success' => false, 'message' => 'Archivo de conexión no encontrado en ../includes/conexion.php']);
+// NUEVO: Endpoint para eliminar cambio de hardware (DEBE IR ANTES del bloque POST principal)
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['accion']) && $_POST['accion'] === 'eliminar_cambio_hardware') {
+    $id_cambio_hardware = (int)($_POST['id_cambio_hardware'] ?? 0);
+    
+    if ($id_cambio_hardware <= 0) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'ID de cambio de hardware inválido']);
+        exit;
     }
-    
-    include('../includes/conexion.php');
-    
-} catch (Exception $e) {
-    logError("Error incluyendo conexion.php: " . $e->getMessage());
-    sendJsonResponse(['success' => false, 'message' => 'Error de conexión: ' . $e->getMessage()]);
-} catch (Error $e) {
-    logError("Error fatal en conexion.php: " . $e->getMessage());
-    sendJsonResponse(['success' => false, 'message' => 'Error fatal en conexión: ' . $e->getMessage()]);
-}
-
-session_start();
-
-// Verificar que la conexión existe (cambiar nombre de variable para coincidir)
-if (!isset($conn)) {
-    logError("Variable conn no definida");
-    sendJsonResponse(['success' => false, 'message' => 'Variable de conexión no definida']);
-}
-
-if (!$conn) {
-    logError("Conn es null o false");
-    sendJsonResponse(['success' => false, 'message' => 'No se pudo establecer conexión con la base de datos']);
-}
-
-// Asignar la conexión a la variable esperada
-$conexion = $conn;
-
-try {
-    $action = $_GET['action'] ?? $_POST['action'] ?? '';
-    logError("Action recibida: " . $action);
-    
-    switch ($action) {
-        case 'test_connection':
-            testConnection();
-            break;
-        case 'get_reparaciones':
-            getReparaciones();
-            break;
-        case 'get_reparacion':
-            getReparacion($_GET['id']);
-            break;
-        case 'create_reparacion':
-            createReparacion();
-            break;
-        case 'update_reparacion':
-            updateReparacion();
-            break;
-        case 'delete_reparacion':
-            deleteReparacion($_POST['id']);
-            break;
-        case 'get_activos':
-            getActivos();
-            break;
-        case 'get_lugares':
-            getLugares();
-            break;
-        case 'get_estados':
-            getEstados();
-            break;
-        case 'get_tipos_cambio':
-            getTiposCambio();
-            break;
-        case 'init_tables':
-            initTables();
-            break;
-        default:
-            sendJsonResponse(['success' => false, 'message' => 'Acción no válida: ' . $action]);
-    }
-} catch (Exception $e) {
-    logError("Exception en switch: " . $e->getMessage());
-    sendJsonResponse(['success' => false, 'message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
-} catch (Error $e) {
-    logError("Error fatal en switch: " . $e->getMessage());
-    sendJsonResponse(['success' => false, 'message' => 'Error fatal: ' . $e->getMessage()]);
-}
-
-function testConnection() {
-    global $conexion;
-    logError("Testing connection...");
     
     try {
-        if (!$conexion) {
-            sendJsonResponse(['success' => false, 'message' => 'Conexión es null']);
+        sqlsrv_begin_transaction($conn);
+        
+        // Verificar que el cambio existe
+        $sql_verificar = "SELECT id_cambio_hardware FROM cambio_hardware WHERE id_cambio_hardware = ?";
+        $stmt_verificar = sqlsrv_query($conn, $sql_verificar, [$id_cambio_hardware]);
+        
+        if (!$stmt_verificar || !sqlsrv_fetch_array($stmt_verificar)) {
+            throw new Exception("El cambio de hardware no existe");
         }
         
-        // Probar una consulta simple
-        $sql = "SELECT 1 as test";
-        $stmt = sqlsrv_query($conexion, $sql);
+        // Eliminar el cambio de hardware
+        $sql_eliminar = "DELETE FROM cambio_hardware WHERE id_cambio_hardware = ?";
+        $stmt_eliminar = sqlsrv_query($conn, $sql_eliminar, [$id_cambio_hardware]);
         
-        if (!$stmt) {
-            $errors = sqlsrv_errors();
-            logError("Error en query test: " . json_encode($errors));
-            sendJsonResponse(['success' => false, 'message' => 'Error en consulta de prueba: ' . json_encode($errors)]);
+        if (!$stmt_eliminar) {
+            throw new Exception("Error eliminando cambio de hardware: " . print_r(sqlsrv_errors(), true));
         }
         
-        $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
-        if ($row && $row['test'] == 1) {
-            logError("Conexión exitosa");
-            sendJsonResponse(['success' => true, 'message' => 'Conexión exitosa']);
-        } else {
-            sendJsonResponse(['success' => false, 'message' => 'No se pudo ejecutar consulta de prueba']);
-        }
+        sqlsrv_commit($conn);
+        
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => true, 
+            'message' => 'Cambio de hardware eliminado correctamente'
+        ]);
+        exit;
         
     } catch (Exception $e) {
-        logError("Exception en testConnection: " . $e->getMessage());
-        sendJsonResponse(['success' => false, 'message' => 'Error en test: ' . $e->getMessage()]);
+        sqlsrv_rollback($conn);
+        error_log("Error eliminando cambio de hardware: " . $e->getMessage());
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        exit;
     }
 }
 
-function initTables() {
-    global $conexion;
-    
-    try {
-        // Crear datos básicos si no existen
-        $tables = [
-            'lugar_reparacion' => [
-                ['nombre_lugar' => 'Area TI'],
-                ['nombre_lugar' => 'Garantia'],
-                ['nombre_lugar' => 'Proveedor Externo']
-            ],
-            'estado_reparacion' => [
-                ['nombre_estado' => 'Pendiente'],
-                ['nombre_estado' => 'En proceso'],
-                ['nombre_estado' => 'Finalizada'],
-                ['nombre_estado' => 'Cancelada']
-            ],
-            'tipo_cambio' => [
-                ['nombre_tipo_cambio' => 'Reemplazo'],
-                ['nombre_tipo_cambio' => 'Adición'],
-                ['nombre_tipo_cambio' => 'Retiro'],
-                ['nombre_tipo_cambio' => 'Actualización']
-            ]
-        ];
+if($_SERVER["REQUEST_METHOD"] === "POST") {
+    $accion = $_POST["accion"] ?? '';
+
+    // CORREGIDO: Manejar guardado de cambios de hardware con estructura de tabla corregida
+    if ($accion === "guardar_cambio_hardware") {
+        $id_reparacion = $_POST["id_reparacion"] ?? '';
+        $id_activo = $_POST["id_activo"] ?? '';
+        $id_tipo_cambio = $_POST["id_tipo_cambio"] ?? '';
+        $tipo_componente = $_POST["tipo_componente"] ?? '';
+        $componente_actual = $_POST["componente_actual"] ?? '';
+        $tipo_nuevo_componente = $_POST["tipo_nuevo_componente"] ?? '';
+        $costo = (isset($_POST["costo"]) && $_POST["costo"] !== '') ? $_POST["costo"] : null;
+        $motivo = $_POST["motivo"] ?? '';
         
-        foreach ($tables as $table => $data) {
-            // Verificar si la tabla tiene datos
-            $checkSql = "SELECT COUNT(*) as count FROM $table";
-            $stmt = sqlsrv_query($conexion, $checkSql);
+        // NUEVO: Validaciones más robustas
+        if (empty($id_reparacion) || empty($id_activo) || empty($id_tipo_cambio) || empty($tipo_componente) || empty($tipo_nuevo_componente)) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'Faltan datos obligatorios']);
+            exit;
+        }
+        
+        try {
+            sqlsrv_begin_transaction($conn);
             
-            if ($stmt) {
-                $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
-                if ($row['count'] == 0) {
-                    // Insertar datos básicos
-                    foreach ($data as $record) {
-                        $columns = array_keys($record);
-                        $values = array_values($record);
-                        $placeholders = str_repeat('?,', count($values) - 1) . '?';
-                        
-                        $insertSql = "INSERT INTO $table (" . implode(',', $columns) . ") VALUES ($placeholders)";
-                        $insertStmt = sqlsrv_prepare($conexion, $insertSql, $values);
-                        sqlsrv_execute($insertStmt);
+            // MEJORADO: Validación específica para tipo de cambio
+            if ($id_tipo_cambio === '1') { // Reemplazo
+                if (empty($componente_actual)) {
+                    throw new Exception("Para un reemplazo debe seleccionar el componente actual");
+                }
+                
+                // CORREGIDO: Verificar que el slot existe y pertenece al activo (sin importar el estado)
+                $sql_verificar = "SELECT COUNT(*) as count FROM slot_activo WHERE id_slot = ? AND id_activo = ?";
+                $stmt_verificar = sqlsrv_query($conn, $sql_verificar, [$componente_actual, $id_activo]);
+                $row_verificar = sqlsrv_fetch_array($stmt_verificar, SQLSRV_FETCH_ASSOC);
+                
+                if ($row_verificar['count'] == 0) {
+                    throw new Exception("El slot seleccionado no existe o no pertenece a este activo");
+                }
+                
+                // NUEVO: Log de debug para verificar los datos
+                error_log("DEBUG: Validando slot - ID Slot: $componente_actual, ID Activo: $id_activo, Count: " . $row_verificar['count']);
+            }
+            
+            // NUEVO: Validar costo si se proporciona
+            if ($costo !== null && $costo < 0) {
+                throw new Exception("El costo no puede ser negativo");
+            }
+            
+            // CORREGIDO: Obtener información del componente actual para TODOS los tipos de cambio
+            $componente_retirado_descripcion = '';
+            
+            if ($componente_actual) {
+                // NUEVO: Verificar el estado del slot seleccionado
+                $sql_verificar_slot = "SELECT estado FROM slot_activo WHERE id_slot = ?";
+                $stmt_verificar_slot = sqlsrv_query($conn, $sql_verificar_slot, [$componente_actual]);
+                $row_slot = sqlsrv_fetch_array($stmt_verificar_slot, SQLSRV_FETCH_ASSOC);
+                
+                if ($row_slot['estado'] === 'disponible') {
+                    $componente_retirado_descripcion = 'Slot disponible - Sin componente previo';
+                } else {
+                    // Solo para slots ocupados, obtener la descripción del componente actual
+                    $sql_actual = "
+                        SELECT sa.tipo_slot,
+                               CASE sa.tipo_slot
+                                   WHEN 'PROCESADOR' THEN 
+                                       CASE 
+                                           WHEN sap.id_procesador IS NOT NULL THEN CONCAT(ISNULL(mp.nombre + ' ', ''), p.modelo)
+                                           WHEN sap.id_procesador_generico IS NOT NULL THEN pg.modelo
+                                       END
+                                   WHEN 'RAM' THEN 
+                                       CASE 
+                                           WHEN sar.id_ram IS NOT NULL THEN CONCAT(r.capacidad, ISNULL(' ' + r.tipo, ''))
+                                           WHEN sar.id_ram_generico IS NOT NULL THEN rg.capacidad
+                                       END
+                                   WHEN 'ALMACENAMIENTO' THEN 
+                                       CASE 
+                                           WHEN saa.id_almacenamiento IS NOT NULL THEN CONCAT(st.capacidad, ISNULL(' ' + st.tipo, ''))
+                                           WHEN saa.id_almacenamiento_generico IS NOT NULL THEN CONCAT(sg.capacidad, ISNULL(' ' + sg.tipo, ''))
+                                       END
+                                   WHEN 'TARJETA_VIDEO' THEN 
+                                       CASE 
+                                           WHEN satv.id_tarjeta_video IS NOT NULL THEN CONCAT(tv.modelo, ISNULL(' ' + tv.memoria, ''))
+                                           WHEN satv.id_tarjeta_video_generico IS NOT NULL THEN CONCAT(tvg.modelo, ISNULL(' ' + tvg.memoria, ''))
+                                       END
+                               END as descripcion
+                        FROM slot_activo sa
+                        LEFT JOIN slot_activo_procesador sap ON sa.id_slot = sap.id_slot
+                        LEFT JOIN procesador p ON sap.id_procesador = p.id_procesador
+                        LEFT JOIN marca mp ON p.id_marca = mp.id_marca
+                        LEFT JOIN procesador_generico pg ON sap.id_procesador_generico = pg.id_procesador_generico
+                        LEFT JOIN slot_activo_ram sar ON sa.id_slot = sar.id_slot
+                        LEFT JOIN RAM r ON sar.id_ram = r.id_ram
+                        LEFT JOIN RAM_generico rg ON sar.id_ram_generico = rg.id_ram_generico
+                        LEFT JOIN slot_activo_almacenamiento saa ON sa.id_slot = saa.id_slot
+                        LEFT JOIN almacenamiento st ON saa.id_almacenamiento = st.id_almacenamiento
+                        LEFT JOIN almacenamiento_generico sg ON saa.id_almacenamiento_generico = sg.id_almacenamiento_generico
+                        LEFT JOIN slot_activo_tarjeta_video satv ON sa.id_slot = satv.id_slot
+                        LEFT JOIN tarjeta_video tv ON satv.id_tarjeta_video = tv.id_tarjeta_video
+                        LEFT JOIN tarjeta_video_generico tvg ON satv.id_tarjeta_video_generico = tvg.id_tarjeta_video_generico
+                        WHERE sa.id_slot = ?";
+                    
+                    $stmt_actual = sqlsrv_query($conn, $sql_actual, [$componente_actual]);
+                    if ($stmt_actual && $row_actual = sqlsrv_fetch_array($stmt_actual, SQLSRV_FETCH_ASSOC)) {
+                        $componente_retirado_descripcion = $row_actual['descripcion'] ?? 'Componente desconocido';
                     }
                 }
+            } else {
+                // Para otros tipos de cambio sin componente seleccionado
+                $descripcion_tipo_cambio = [
+                    '2' => 'Adición de nuevo componente',
+                    '3' => 'Retiro de componente',
+                    '4' => 'Actualización de componente'
+                ];
+                $componente_retirado_descripcion = $descripcion_tipo_cambio[$id_tipo_cambio] ?? 'Cambio de componente';
             }
-        }
-        
-        sendJsonResponse(['success' => true, 'message' => 'Tablas inicializadas correctamente']);
-        
-    } catch (Exception $e) {
-        sendJsonResponse(['success' => false, 'message' => 'Error inicializando tablas: ' . $e->getMessage()]);
-    }
-}
-
-function getReparaciones() {
-    global $conexion;
-    
-    try {
-        $sql = "SELECT r.*, 
-                       CASE 
-                           WHEN a.id_laptop IS NOT NULL THEN ISNULL(l.nombreEquipo, 'Sin nombre')
-                           WHEN a.id_pc IS NOT NULL THEN ISNULL(p.nombreEquipo, 'Sin nombre') 
-                           WHEN a.id_servidor IS NOT NULL THEN ISNULL(s.nombreEquipo, 'Sin nombre')
-                           ELSE 'Activo sin tipo'
-                       END as nombre_equipo,
-                       ISNULL(a.tipo_activo, 'Sin tipo') as tipo_activo,
-                       ISNULL(lr.nombre_lugar, 'Sin lugar') as nombre_lugar,
-                       ISNULL(er.nombre_estado, 'Sin estado') as nombre_estado
-                FROM reparacion r
-                INNER JOIN activo a ON r.id_activo = a.id_activo
-                LEFT JOIN laptop l ON a.id_laptop = l.id_laptop
-                LEFT JOIN pc p ON a.id_pc = p.id_pc
-                LEFT JOIN servidor s ON a.id_servidor = s.id_servidor
-                LEFT JOIN lugar_reparacion lr ON r.id_lugar_reparacion = lr.id_lugar
-                LEFT JOIN estado_reparacion er ON r.id_estado_reparacion = er.id_estado_reparacion
-                ORDER BY r.fecha DESC";
-        
-        $stmt = sqlsrv_query($conexion, $sql);
-        if (!$stmt) {
-            $errors = sqlsrv_errors();
-            throw new Exception('Error al obtener reparaciones: ' . json_encode($errors));
-        }
-        
-        $reparaciones = [];
-        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-            if ($row['fecha']) {
-                $row['fecha'] = $row['fecha']->format('Y-m-d');
+            
+            // CORREGIDO: Procesar el nuevo componente según el tipo y crear referencias correctas
+            $nuevo_componente_id = null;
+            $nuevo_componente_tabla = '';
+            $nuevo_componente_descripcion = '';
+            
+            // Variables para las columnas específicas en cambio_hardware
+            $id_procesador_cambio = null;
+            $id_ram_cambio = null;
+            $id_almacenamiento_cambio = null;
+            $id_tarjeta_video_cambio = null;
+            
+            // NUEVO: Variables para componentes genéricos en cambio_hardware
+            $id_procesador_generico_cambio = null;
+            $id_ram_generico_cambio = null;
+            $id_almacenamiento_generico_cambio = null;
+            $id_tarjeta_video_generico_cambio = null;
+            
+            switch ($tipo_nuevo_componente) {
+                case 'existente':
+                    $componente_existente = $_POST["id_componente_existente"] ?? '';
+                    if (empty($componente_existente)) {
+                        throw new Exception("Debe seleccionar un componente existente");
+                    }
+                    
+                    if (!preg_match('/^(generico|detallado)_(\d+)$/', $componente_existente, $matches)) {
+                        throw new Exception("Formato de componente existente inválido");
+                    }
+                    
+                    $tipo_comp = $matches[1];
+                    $id_comp = $matches[2];
+                    $nuevo_componente_id = $id_comp;
+                    
+                    // CORREGIDO: Obtener descripción y configurar IDs para AMBOS tipos (genérico y detallado)
+                    $sql_desc = '';
+                    switch ($tipo_componente) {
+                        case 'procesador':
+                            if ($tipo_comp === 'generico') {
+                                $sql_desc = "SELECT modelo as descripcion FROM procesador_generico WHERE id_procesador_generico = ?";
+                                $nuevo_componente_tabla = 'id_procesador_generico';
+                                $id_procesador_generico_cambio = $nuevo_componente_id; // NUEVO: Asignar para genéricos
+                            } else {
+                                $sql_desc = "SELECT CONCAT(ISNULL(m.nombre + ' ', ''), p.modelo) as descripcion FROM procesador p LEFT JOIN marca m ON p.id_marca = m.id_marca WHERE p.id_procesador = ?";
+                                $nuevo_componente_tabla = 'id_procesador';
+                                $id_procesador_cambio = $nuevo_componente_id;
+                            }
+                            break;
+                        case 'ram':
+                            if ($tipo_comp === 'generico') {
+                                $sql_desc = "SELECT capacidad as descripcion FROM RAM_generico WHERE id_ram_generico = ?";
+                                $nuevo_componente_tabla = 'id_ram_generico';
+                                $id_ram_generico_cambio = $nuevo_componente_id; // NUEVO: Asignar para genéricos
+                            } else {
+                                $sql_desc = "SELECT CONCAT(r.capacidad, ISNULL(' ' + r.tipo, '')) as descripcion FROM RAM r WHERE r.id_ram = ?";
+                                $nuevo_componente_tabla = 'id_ram';
+                                $id_ram_cambio = $nuevo_componente_id;
+                            }
+                            break;
+                        case 'almacenamiento':
+                            if ($tipo_comp === 'generico') {
+                                $sql_desc = "SELECT CONCAT(capacidad, ISNULL(' ' + tipo, '')) as descripcion FROM almacenamiento_generico WHERE id_almacenamiento_generico = ?";
+                                $nuevo_componente_tabla = 'id_almacenamiento_generico';
+                                $id_almacenamiento_generico_cambio = $nuevo_componente_id; // NUEVO: Asignar para genéricos
+                            } else {
+                                $sql_desc = "SELECT CONCAT(a.capacidad, ISNULL(' ' + a.tipo, '')) as descripcion FROM almacenamiento a WHERE a.id_almacenamiento = ?";
+                                $nuevo_componente_tabla = 'id_almacenamiento';
+                                $id_almacenamiento_cambio = $nuevo_componente_id;
+                            }
+                            break;
+                        case 'tarjeta_video':
+                            if ($tipo_comp === 'generico') {
+                                $sql_desc = "SELECT CONCAT(modelo, ISNULL(' ' + memoria, '')) as descripcion FROM tarjeta_video_generico WHERE id_tarjeta_video_generico = ?";
+                                $nuevo_componente_tabla = 'id_tarjeta_video_generico';
+                                $id_tarjeta_video_generico_cambio = $nuevo_componente_id; // NUEVO: Asignar para genéricos
+                            } else {
+                                $sql_desc = "SELECT CONCAT(tv.modelo, ISNULL(' ' + tv.memoria, '')) as descripcion FROM tarjeta_video tv WHERE tv.id_tarjeta_video = ?";
+                                $nuevo_componente_tabla = 'id_tarjeta_video';
+                                $id_tarjeta_video_cambio = $nuevo_componente_id;
+                            }
+                            break;
+                    }
+                    
+                    $stmt_desc = sqlsrv_query($conn, $sql_desc, [$nuevo_componente_id]);
+                    if ($stmt_desc && $row_desc = sqlsrv_fetch_array($stmt_desc, SQLSRV_FETCH_ASSOC)) {
+                        $nuevo_componente_descripcion = $row_desc['descripcion'] ?? 'Componente';
+                    } else {
+                        throw new Exception("No se encontró el componente seleccionado");
+                    }
+                    break;
+                    
+                case 'generico':
+                    $descripcion_generica = trim($_POST["descripcion_generica"] ?? '');
+                    if (empty($descripcion_generica)) {
+                        throw new Exception("Debe ingresar una descripción para el componente genérico");
+                    }
+                    
+                    $nuevo_componente_descripcion = $descripcion_generica;
+                    
+                    // CORREGIDO: Crear componente genérico Y asignarlo a cambio_hardware
+                    switch ($tipo_componente) {
+                        case 'procesador':
+                            $sql_gen = "INSERT INTO procesador_generico (modelo) OUTPUT INSERTED.id_procesador_generico VALUES (?)";
+                            $stmt_gen = sqlsrv_query($conn, $sql_gen, [$descripcion_generica]);
+                            $row_gen = sqlsrv_fetch_array($stmt_gen, SQLSRV_FETCH_ASSOC);
+                            $nuevo_componente_id = $row_gen['id_procesador_generico'];
+                            $nuevo_componente_tabla = 'id_procesador_generico';
+                            $id_procesador_generico_cambio = $nuevo_componente_id; // NUEVO: Asignar para genéricos
+                            break;
+                        case 'ram':
+                            $sql_gen = "INSERT INTO RAM_generico (capacidad) OUTPUT INSERTED.id_ram_generico VALUES (?)";
+                            $stmt_gen = sqlsrv_query($conn, $sql_gen, [$descripcion_generica]);
+                            $row_gen = sqlsrv_fetch_array($stmt_gen, SQLSRV_FETCH_ASSOC);
+                            $nuevo_componente_id = $row_gen['id_ram_generico'];
+                            $nuevo_componente_tabla = 'id_ram_generico';
+                            $id_ram_generico_cambio = $nuevo_componente_id; // NUEVO: Asignar para genéricos
+                            break;
+                        case 'almacenamiento':
+                            $sql_gen = "INSERT INTO almacenamiento_generico (capacidad) OUTPUT INSERTED.id_almacenamiento_generico VALUES (?)";
+                            $stmt_gen = sqlsrv_query($conn, $sql_gen, [$descripcion_generica]);
+                            $row_gen = sqlsrv_fetch_array($stmt_gen, SQLSRV_FETCH_ASSOC);
+                            $nuevo_componente_id = $row_gen['id_almacenamiento_generico'];
+                            $nuevo_componente_tabla = 'id_almacenamiento_generico';
+                            $id_almacenamiento_generico_cambio = $nuevo_componente_id; // NUEVO: Asignar para genéricos
+                            break;
+                        case 'tarjeta_video':
+                            $sql_gen = "INSERT INTO tarjeta_video_generico (modelo) OUTPUT INSERTED.id_tarjeta_video_generico VALUES (?)";
+                            $stmt_gen = sqlsrv_query($conn, $sql_gen, [$descripcion_generica]);
+                            $row_gen = sqlsrv_fetch_array($stmt_gen, SQLSRV_FETCH_ASSOC);
+                            $nuevo_componente_id = $row_gen['id_tarjeta_video_generico'];
+                            $nuevo_componente_tabla = 'id_tarjeta_video_generico';
+                            $id_tarjeta_video_generico_cambio = $nuevo_componente_id; // NUEVO: Asignar para genéricos
+                            break;
+                    }
+                    
+                    if (!$stmt_gen || !$nuevo_componente_id) {
+                        throw new Exception("Error creando componente genérico: " . print_r(sqlsrv_errors(), true));
+                    }
+                    break;
+                    
+                case 'detallado':
+                    // Crear componente detallado según el tipo
+                    switch ($tipo_componente) {
+                        case 'procesador':
+                            $marca = $_POST["marca_procesador"] ?? '';
+                            $modelo = trim($_POST["modelo_procesador"] ?? '');
+                            $generacion = trim($_POST["generacion_procesador"] ?? '');
+                            
+                            if (empty($marca) || empty($modelo)) {
+                                throw new Exception("Marca y modelo son obligatorios para procesador detallado");
+                            }
+                            
+                            $nuevo_componente_descripcion = $modelo . ($generacion ? " $generacion" : '');
+                            $sql_det = "INSERT INTO procesador (modelo, generacion, id_marca) OUTPUT INSERTED.id_procesador VALUES (?, ?, ?)";
+                            $stmt_det = sqlsrv_query($conn, $sql_det, [$modelo, $generacion ?: null, $marca]);
+                            $row_det = sqlsrv_fetch_array($stmt_det, SQLSRV_FETCH_ASSOC);
+                            $nuevo_componente_id = $row_det['id_procesador'];
+                            $nuevo_componente_tabla = 'id_procesador';
+                            $id_procesador_cambio = $nuevo_componente_id;
+                            break;
+                            
+                        case 'ram':
+                            $marca = $_POST["marca_ram"] ?? '';
+                            $capacidad = trim($_POST["capacidad_ram"] ?? '');
+                            $tipo = trim($_POST["tipo_ram"] ?? '');
+                            $frecuencia = trim($_POST["frecuencia_ram"] ?? '');
+                            
+                            if (empty($marca) || empty($capacidad)) {
+                                throw new Exception("Marca y capacidad son obligatorios para RAM detallada");
+                            }
+                            
+                            $nuevo_componente_descripcion = $capacidad . ($tipo ? " $tipo" : '') . ($frecuencia ? " $frecuencia" : '');
+                            $sql_det = "INSERT INTO RAM (capacidad, tipo, frecuencia, id_marca) OUTPUT INSERTED.id_ram VALUES (?, ?, ?, ?)";
+                            $stmt_det = sqlsrv_query($conn, $sql_det, [$capacidad, $tipo ?: null, $frecuencia ?: null, $marca]);
+                            $row_det = sqlsrv_fetch_array($stmt_det, SQLSRV_FETCH_ASSOC);
+                            $nuevo_componente_id = $row_det['id_ram'];
+                            $nuevo_componente_tabla = 'id_ram';
+                            $id_ram_cambio = $nuevo_componente_id;
+                            break;
+                            
+                        case 'almacenamiento':
+                            $marca = $_POST["marca_almacenamiento"] ?? '';
+                            $capacidad = trim($_POST["capacidad_almacenamiento"] ?? '');
+                            $tipo = trim($_POST["tipo_almacenamiento"] ?? '');
+                            
+                            if (empty($marca) || empty($capacidad)) {
+                                throw new Exception("Marca y capacidad son obligatorios para almacenamiento detallado");
+                            }
+                            
+                            $nuevo_componente_descripcion = $capacidad . ($tipo ? " $tipo" : '');
+                            $sql_det = "INSERT INTO almacenamiento (capacidad, tipo, id_marca) OUTPUT INSERTED.id_almacenamiento VALUES (?, ?, ?)";
+                            $stmt_det = sqlsrv_query($conn, $sql_det, [$capacidad, $tipo ?: null, $marca]);
+                            $row_det = sqlsrv_fetch_array($stmt_det, SQLSRV_FETCH_ASSOC);
+                            $nuevo_componente_id = $row_det['id_almacenamiento'];
+                            $nuevo_componente_tabla = 'id_almacenamiento';
+                            $id_almacenamiento_cambio = $nuevo_componente_id;
+                            break;
+                            
+                        case 'tarjeta_video':
+                            $marca = $_POST["marca_tarjeta_video"] ?? '';
+                            $modelo = trim($_POST["modelo_tarjeta_video"] ?? '');
+                            $memoria = trim($_POST["memoria_tarjeta_video"] ?? '');
+                            $tipo_memoria = trim($_POST["tipo_memoria_tarjeta_video"] ?? '');
+                            
+                            if (empty($marca) || empty($modelo)) {
+                                throw new Exception("Marca y modelo son obligatorios para tarjeta de video detallada");
+                            }
+                            
+                            $nuevo_componente_descripcion = $modelo . ($memoria ? " $memoria" : '');
+                            $sql_det = "INSERT INTO tarjeta_video (modelo, memoria, tipo_memoria, id_marca) OUTPUT INSERTED.id_tarjeta_video VALUES (?, ?, ?, ?)";
+                            $stmt_det = sqlsrv_query($conn, $sql_det, [$modelo, $memoria ?: null, $tipo_memoria ?: null, $marca]);
+                            $row_det = sqlsrv_fetch_array($stmt_det, SQLSRV_FETCH_ASSOC);
+                            $nuevo_componente_id = $row_det['id_tarjeta_video'];
+                            $nuevo_componente_tabla = 'id_tarjeta_video';
+                            $id_tarjeta_video_cambio = $nuevo_componente_id;
+                            break;
+                    }
+                    
+                    if (!$stmt_det || !$nuevo_componente_id) {
+                        throw new Exception("Error creando componente detallado: " . print_r(sqlsrv_errors(), true));
+                    }
+                    break;
+                    
+                default:
+                    throw new Exception("Tipo de nuevo componente no válido: $tipo_nuevo_componente");
             }
-            $reparaciones[] = $row;
+            
+            // CORREGIDO: Registrar cambio de hardware con TODAS las columnas (detallados Y genéricos)
+            $sql_cambio = "INSERT INTO cambio_hardware (
+                id_activo, id_reparacion, 
+                id_procesador, id_ram, id_almacenamiento, id_tarjeta_video,
+                id_procesador_generico, id_ram_generico, id_almacenamiento_generico, id_tarjeta_video_generico,
+                id_tipo_cambio, fecha, motivo, costo, componente_retirado
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE(), ?, ?, ?)";
+            
+            $params_cambio = [
+                $id_activo, 
+                $id_reparacion, 
+                // Componentes detallados
+                $id_procesador_cambio,
+                $id_ram_cambio,
+                $id_almacenamiento_cambio,
+                $id_tarjeta_video_cambio,
+                // NUEVO: Componentes genéricos
+                $id_procesador_generico_cambio,
+                $id_ram_generico_cambio,
+                $id_almacenamiento_generico_cambio,
+                $id_tarjeta_video_generico_cambio,
+                // Otros campos
+                $id_tipo_cambio, 
+                $motivo, 
+                $costo, 
+                $componente_retirado_descripcion
+            ];
+            
+            $stmt_cambio = sqlsrv_query($conn, $sql_cambio, $params_cambio);
+            
+            if (!$stmt_cambio) {
+                throw new Exception("Error registrando cambio de hardware: " . print_r(sqlsrv_errors(), true));
+            }
+            
+            // NUEVO: Log detallado para verificar qué se guardó
+            error_log("SUCCESS: Cambio registrado - Detallados: [P:$id_procesador_cambio, R:$id_ram_cambio, A:$id_almacenamiento_cambio, TV:$id_tarjeta_video_cambio] - Genéricos: [P:$id_procesador_generico_cambio, R:$id_ram_generico_cambio, A:$id_almacenamiento_generico_cambio, TV:$id_tarjeta_video_generico_cambio]");
+            
+            // CORREGIDO: Actualizar el slot del activo SIEMPRE que tengamos componente_actual y nuevo_componente_id
+            if ($componente_actual && $nuevo_componente_id && $nuevo_componente_tabla) {
+                // Limpiar slot actual - eliminar de todas las tablas de slots para ese slot específico
+                $sqls_limpiar = [
+                    "DELETE FROM slot_activo_procesador WHERE id_slot = ?",
+                    "DELETE FROM slot_activo_ram WHERE id_slot = ?",
+                    "DELETE FROM slot_activo_almacenamiento WHERE id_slot = ?",
+                    "DELETE FROM slot_activo_tarjeta_video WHERE id_slot = ?"
+                ];
+                
+                foreach ($sqls_limpiar as $sql_limpiar) {
+                    $stmt_limpiar = sqlsrv_query($conn, $sql_limpiar, [$componente_actual]);
+                    if (!$stmt_limpiar) {
+                        error_log("Warning: Error limpiando slot: " . print_r(sqlsrv_errors(), true));
+                    }
+                }
+                
+                // Insertar nuevo componente en el slot correspondiente
+                $tabla_slot = '';
+                switch ($tipo_componente) {
+                    case 'procesador':
+                        $tabla_slot = 'slot_activo_procesador';
+                        break;
+                    case 'ram':
+                        $tabla_slot = 'slot_activo_ram';
+                        break;
+                    case 'almacenamiento':
+                        $tabla_slot = 'slot_activo_almacenamiento';
+                        break;
+                    case 'tarjeta_video':
+                        $tabla_slot = 'slot_activo_tarjeta_video';
+                        break;
+                }
+                
+                if ($tabla_slot && $nuevo_componente_tabla) {
+                    $sql_insertar = "INSERT INTO $tabla_slot (id_slot, $nuevo_componente_tabla) VALUES (?, ?)";
+                    $stmt_insertar = sqlsrv_query($conn, $sql_insertar, [$componente_actual, $nuevo_componente_id]);
+                    
+                    if (!$stmt_insertar) {
+                        throw new Exception("Error actualizando slot: " . print_r(sqlsrv_errors(), true));
+                    }
+                    
+                    // NUEVO: Actualizar estado del slot a 'ocupado'
+                    $sql_update_estado = "UPDATE slot_activo SET estado = 'ocupado' WHERE id_slot = ?";
+                    $stmt_update_estado = sqlsrv_query($conn, $sql_update_estado, [$componente_actual]);
+                    
+                    if (!$stmt_update_estado) {
+                        error_log("Warning: Error actualizando estado del slot: " . print_r(sqlsrv_errors(), true));
+                    }
+                    
+                    error_log("SUCCESS: Slot actualizado - Tabla: $tabla_slot, Columna: $nuevo_componente_tabla, ID: $nuevo_componente_id, Slot: $componente_actual");
+                }
+            }
+            
+            sqlsrv_commit($conn);
+            
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => true, 
+                'message' => 'Cambio de hardware guardado correctamente',
+                'data' => [
+                    'id_cambio' => $nuevo_componente_id,
+                    'descripcion_nuevo' => $nuevo_componente_descripcion,
+                    'descripcion_retirado' => $componente_retirado_descripcion,
+                    'debug' => [
+                        'slot_actualizado' => ($componente_actual && $id_tipo_cambio === '1'),
+                        'tabla_slot' => $tabla_slot ?? 'N/A',
+                        'columna' => $nuevo_componente_tabla,
+                        'id_componente' => $nuevo_componente_id,
+                        'cambio_hardware_detallados' => [
+                            'procesador' => $id_procesador_cambio,
+                            'ram' => $id_ram_cambio,
+                            'almacenamiento' => $id_almacenamiento_cambio,
+                            'tarjeta_video' => $id_tarjeta_video_cambio
+                        ],
+                        'cambio_hardware_genericos' => [
+                            'procesador_generico' => $id_procesador_generico_cambio,
+                            'ram_generico' => $id_ram_generico_cambio,
+                            'almacenamiento_generico' => $id_almacenamiento_generico_cambio,
+                            'tarjeta_video_generico' => $id_tarjeta_video_generico_cambio
+                        ]
+                    ]
+                ]
+            ]);
+            exit;
+            
+        } catch (Exception $e) {
+            sqlsrv_rollback($conn);
+            error_log("Error guardando cambio de hardware: " . $e->getMessage());
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            exit;
         }
+    }
+
+    // Variables comunes para otras acciones
+    $id_activo = $_POST["id_activo"] ?? '';
+    $id_lugar_reparacion = $_POST["id_lugar_reparacion"] ?? '';
+    $id_estado_reparacion = $_POST["id_estado_reparacion"] ?? '';
+    $descripcion = $_POST["descripcion"] ?? '';
+    
+    // CORREGIDO: Manejar costo para permitir el valor 0
+    $costo = null;
+    if (isset($_POST["costo"]) && $_POST["costo"] !== '') {
+        $costo = floatval($_POST["costo"]);
+    }
+    
+    // CORREGIDO: Manejar tiempo_inactividad para permitir el valor 0
+    $tiempo_inactividad = null;
+    if (isset($_POST["tiempo_inactividad"]) && $_POST["tiempo_inactividad"] !== '') {
+        $tiempo_inactividad = (int)$_POST["tiempo_inactividad"];
+    }
+    
+    $fecha = $_POST["fecha"] ?? '';
+    $id_reparacion = $_POST["id_reparacion"] ?? '';
+    $id_usuario = $_SESSION['id_usuario'] ?? 1;
+
+    if ($accion === "crear") {
+        $sql = "INSERT INTO reparacion (id_usuario, id_activo, id_lugar_reparacion, id_estado_reparacion, fecha, descripcion, costo, tiempo_inactividad) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        $params = [$id_usuario, $id_activo, $id_lugar_reparacion, $id_estado_reparacion, $fecha, $descripcion, $costo, $tiempo_inactividad];
+    } elseif ($accion === "editar" && !empty($id_reparacion)) {
+        $sql = "UPDATE reparacion 
+                SET id_activo = ?, id_lugar_reparacion = ?, id_estado_reparacion = ?, fecha = ?, descripcion = ?, costo = ?, tiempo_inactividad = ?
+                WHERE id_reparacion = ?";
+        $params = [$id_activo, $id_lugar_reparacion, $id_estado_reparacion, $fecha, $descripcion, $costo, $tiempo_inactividad, $id_reparacion];
+    } elseif ($accion === "eliminar" && !empty($id_reparacion)) {
+        // Primero eliminar cambios de hardware relacionados
+        $sqlCambios = "DELETE FROM cambio_hardware WHERE id_reparacion = ?";
+        $stmtCambios = sqlsrv_query($conn, $sqlCambios, [$id_reparacion]);
         
-        sendJsonResponse($reparaciones);
-        
-    } catch (Exception $e) {
-        logError("Error en getReparaciones: " . $e->getMessage());
-        sendJsonResponse(['success' => false, 'message' => 'Error obteniendo reparaciones: ' . $e->getMessage()]);
+        // Luego eliminar la reparación
+        $sql = "DELETE FROM reparacion WHERE id_reparacion = ?";
+        $params = [$id_reparacion];
+    } else {
+        die("Acción no válida o faltan datos.");
+    }
+
+    $stmt = sqlsrv_query($conn, $sql, $params);
+
+    if ($stmt) {
+        header("Location: ../views/crud_reparacion.php?success=1");
+        exit;
+    } else {
+        echo "Error en la operación:<br>";
+        print_r(sqlsrv_errors());
     }
 }
 
-function getReparacion($id) {
-    global $conexion;
+// Endpoint para obtener componentes por tipo
+if ($_SERVER["REQUEST_METHOD"] === "GET" && isset($_GET['action']) && $_GET['action'] === 'get_componentes') {
+    $tipo = $_GET['tipo'] ?? '';
     
-    $sql = "SELECT * FROM reparacion WHERE id_reparacion = ?";
-    $stmt = sqlsrv_prepare($conexion, $sql, [$id]);
-    
-    if (!$stmt || !sqlsrv_execute($stmt)) {
-        throw new Exception('Error al obtener reparación');
+    if (empty($tipo)) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'Tipo de componente no especificado']);
+        exit;
     }
-    
-    $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
-    if ($row && $row['fecha']) {
-        $row['fecha'] = $row['fecha']->format('Y-m-d');
-    }
-    
-    echo json_encode($row);
-}
-
-function createReparacion() {
-    global $conexion;
-    
-    $id_usuario = $_SESSION['id_usuario'] ?? 1; // Asumir usuario logueado
-    $id_activo = $_POST['id_activo'];
-    $fecha = $_POST['fecha'];
-    $id_lugar_reparacion = $_POST['id_lugar_reparacion'];
-    $id_estado_reparacion = $_POST['id_estado_reparacion'];
-    $descripcion = $_POST['descripcion'] ?? null;
-    $costo = !empty($_POST['costo']) ? $_POST['costo'] : null;
-    $tiempo_inactividad = !empty($_POST['tiempo_inactividad']) ? $_POST['tiempo_inactividad'] : null;
-    
-    $sql = "INSERT INTO reparacion (id_usuario, id_activo, id_lugar_reparacion, id_estado_reparacion, fecha, descripcion, costo, tiempo_inactividad) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-    
-    $params = [$id_usuario, $id_activo, $id_lugar_reparacion, $id_estado_reparacion, $fecha, $descripcion, $costo, $tiempo_inactividad];
-    $stmt = sqlsrv_prepare($conexion, $sql, $params);
-    
-    if (!$stmt || !sqlsrv_execute($stmt)) {
-        throw new Exception('Error al crear reparación');
-    }
-    
-    echo json_encode(['success' => true, 'message' => 'Reparación creada exitosamente']);
-}
-
-function updateReparacion() {
-    global $conexion;
-    
-    $id_reparacion = $_POST['id_reparacion'];
-    $id_activo = $_POST['id_activo'];
-    $fecha = $_POST['fecha'];
-    $id_lugar_reparacion = $_POST['id_lugar_reparacion'];
-    $id_estado_reparacion = $_POST['id_estado_reparacion'];
-    $descripcion = $_POST['descripcion'] ?? null;
-    $costo = !empty($_POST['costo']) ? $_POST['costo'] : null;
-    $tiempo_inactividad = !empty($_POST['tiempo_inactividad']) ? $_POST['tiempo_inactividad'] : null;
-    
-    $sql = "UPDATE reparacion 
-            SET id_activo = ?, id_lugar_reparacion = ?, id_estado_reparacion = ?, fecha = ?, descripcion = ?, costo = ?, tiempo_inactividad = ?
-            WHERE id_reparacion = ?";
-    
-    $params = [$id_activo, $id_lugar_reparacion, $id_estado_reparacion, $fecha, $descripcion, $costo, $tiempo_inactividad, $id_reparacion];
-    $stmt = sqlsrv_prepare($conexion, $sql, $params);
-    
-    if (!$stmt || !sqlsrv_execute($stmt)) {
-        throw new Exception('Error al actualizar reparación');
-    }
-    
-    echo json_encode(['success' => true, 'message' => 'Reparación actualizada exitosamente']);
-}
-
-function deleteReparacion($id) {
-    global $conexion;
-    
-    // Primero eliminar cambios de hardware relacionados
-    $sql = "DELETE FROM cambio_hardware WHERE id_reparacion = ?";
-    $stmt = sqlsrv_prepare($conexion, $sql, [$id]);
-    sqlsrv_execute($stmt);
-    
-    // Luego eliminar la reparación
-    $sql = "DELETE FROM reparacion WHERE id_reparacion = ?";
-    $stmt = sqlsrv_prepare($conexion, $sql, [$id]);
-    
-    if (!$stmt || !sqlsrv_execute($stmt)) {
-        throw new Exception('Error al eliminar reparación');
-    }
-    
-    echo json_encode(['success' => true, 'message' => 'Reparación eliminada exitosamente']);
-}
-
-function getActivos() {
-    global $conexion;
     
     try {
-        // Verificar si existen tablas y datos
-        $sql = "SELECT a.id_activo, a.tipo_activo,
-                       CASE 
-                           WHEN a.id_laptop IS NOT NULL THEN ISNULL(l.nombreEquipo, 'Sin nombre')
-                           WHEN a.id_pc IS NOT NULL THEN ISNULL(p.nombreEquipo, 'Sin nombre')
-                           WHEN a.id_servidor IS NOT NULL THEN ISNULL(s.nombreEquipo, 'Sin nombre')
-                           ELSE 'Activo sin tipo'
-                       END as nombre_equipo
-                FROM activo a
-                LEFT JOIN laptop l ON a.id_laptop = l.id_laptop
-                LEFT JOIN pc p ON a.id_pc = p.id_pc
-                LEFT JOIN servidor s ON a.id_servidor = s.id_servidor
-                ORDER BY nombre_equipo";
+        $componentes = [];
         
-        $stmt = sqlsrv_query($conexion, $sql);
-        if (!$stmt) {
-            $errors = sqlsrv_errors();
-            throw new Exception('Error al obtener activos: ' . json_encode($errors));
+        switch ($tipo) {
+            case 'procesador':
+                // Componentes detallados
+                $sql_detallados = "
+                    SELECT 
+                        p.id_procesador as id, 
+                        CONCAT(ISNULL(m.nombre + ' ', ''), p.modelo, ISNULL(' ' + p.generacion, '')) as descripcion,
+                        'detallado' as tipo
+                    FROM procesador p 
+                    LEFT JOIN marca m ON p.id_marca = m.id_marca
+                    ORDER BY descripcion";
+                
+                $stmt_detallados = sqlsrv_query($conn, $sql_detallados);
+                if ($stmt_detallados) {
+                    while ($row = sqlsrv_fetch_array($stmt_detallados, SQLSRV_FETCH_ASSOC)) {
+                        $componentes[] = $row;
+                    }
+                }
+                
+                // Componentes genéricos
+                $sql_genericos = "
+                    SELECT 
+                        id_procesador_generico as id, 
+                        CONCAT(modelo, ISNULL(' ' + generacion, '')) as descripcion,
+                        'generico' as tipo
+                    FROM procesador_generico
+                    ORDER BY descripcion";
+                
+                $stmt_genericos = sqlsrv_query($conn, $sql_genericos);
+                if ($stmt_genericos) {
+                    while ($row = sqlsrv_fetch_array($stmt_genericos, SQLSRV_FETCH_ASSOC)) {
+                        $componentes[] = $row;
+                    }
+                }
+                break;
+                
+            case 'ram':
+                // RAM detalladas
+                $sql_detallados = "
+                    SELECT 
+                        r.id_ram as id, 
+                        CONCAT(r.capacidad, ISNULL(' ' + r.tipo, ''), ISNULL(' ' + m.nombre, '')) as descripcion,
+                        'detallado' as tipo
+                    FROM RAM r 
+                    LEFT JOIN marca m ON r.id_marca = m.id_marca
+                    ORDER BY descripcion";
+                
+                $stmt_detallados = sqlsrv_query($conn, $sql_detallados);
+                if ($stmt_detallados) {
+                    while ($row = sqlsrv_fetch_array($stmt_detallados, SQLSRV_FETCH_ASSOC)) {
+                        $componentes[] = $row;
+                    }
+                }
+                
+                // RAM genéricas
+                $sql_genericos = "
+                    SELECT 
+                        id_ram_generico as id, 
+                        capacidad as descripcion,
+                        'generico' as tipo
+                    FROM RAM_generico
+                    ORDER BY descripcion";
+                
+                $stmt_genericos = sqlsrv_query($conn, $sql_genericos);
+                if ($stmt_genericos) {
+                    while ($row = sqlsrv_fetch_array($stmt_genericos, SQLSRV_FETCH_ASSOC)) {
+                        $componentes[] = $row;
+                    }
+                }
+                break;
+                
+            case 'almacenamiento':
+                // Almacenamiento detallado
+                $sql_detallados = "
+                    SELECT 
+                        a.id_almacenamiento as id, 
+                        CONCAT(a.capacidad, ISNULL(' ' + a.tipo, ''), ISNULL(' ' + m.nombre, '')) as descripcion,
+                        'detallado' as tipo
+                    FROM almacenamiento a 
+                    LEFT JOIN marca m ON a.id_marca = m.id_marca
+                    ORDER BY descripcion";
+                
+                $stmt_detallados = sqlsrv_query($conn, $sql_detallados);
+                if ($stmt_detallados) {
+                    while ($row = sqlsrv_fetch_array($stmt_detallados, SQLSRV_FETCH_ASSOC)) {
+                        $componentes[] = $row;
+                    }
+                }
+                
+                // Almacenamiento genérico
+                $sql_genericos = "
+                    SELECT 
+                        id_almacenamiento_generico as id, 
+                        CONCAT(capacidad, ISNULL(' ' + tipo, '')) as descripcion,
+                        'generico' as tipo
+                    FROM almacenamiento_generico
+                    ORDER BY descripcion";
+                
+                $stmt_genericos = sqlsrv_query($conn, $sql_genericos);
+                if ($stmt_genericos) {
+                    while ($row = sqlsrv_fetch_array($stmt_genericos, SQLSRV_FETCH_ASSOC)) {
+                        $componentes[] = $row;
+                    }
+                }
+                break;
+                
+            case 'tarjeta_video':
+                // Tarjetas de video detalladas
+                $sql_detallados = "
+                    SELECT 
+                        tv.id_tarjeta_video as id, 
+                        CONCAT(ISNULL(m.nombre + ' ', ''), tv.modelo, ISNULL(' ' + tv.memoria, ''), ISNULL(' ' + tv.tipo_memoria, '')) as descripcion,
+                        'detallado' as tipo
+                    FROM tarjeta_video tv
+                    LEFT JOIN marca m ON tv.id_marca = m.id_marca
+                    ORDER BY descripcion";
+                
+                $stmt_detallados = sqlsrv_query($conn, $sql_detallados);
+                if ($stmt_detallados) {
+                    while ($row = sqlsrv_fetch_array($stmt_detallados, SQLSRV_FETCH_ASSOC)) {
+                        $componentes[] = $row;
+                    }
+                }
+                
+                // Tarjetas de video genéricas
+                $sql_genericos = "
+                    SELECT 
+                        id_tarjeta_video_generico as id, 
+                        CONCAT(modelo, ISNULL(' ' + memoria, '')) as descripcion,
+                        'generico' as tipo
+                    FROM tarjeta_video_generico
+                    ORDER BY descripcion";
+                
+                $stmt_genericos = sqlsrv_query($conn, $sql_genericos);
+                if ($stmt_genericos) {
+                    while ($row = sqlsrv_fetch_array($stmt_genericos, SQLSRV_FETCH_ASSOC)) {
+                        $componentes[] = $row;
+                    }
+                }
+                break;
+                
+            default:
+                throw new Exception("Tipo de componente no soportado: $tipo");
         }
         
-        $activos = [];
-        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-            $activos[] = $row;
-        }
-        
-        sendJsonResponse($activos);
+        header('Content-Type: application/json');
+        echo json_encode($componentes);
+        exit;
         
     } catch (Exception $e) {
-        logError("Error en getActivos: " . $e->getMessage());
-        sendJsonResponse(['success' => false, 'message' => 'Error obteniendo activos: ' . $e->getMessage()]);
+        error_log("Error obteniendo componentes para reparaciones: " . $e->getMessage());
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false, 
+            'error' => 'Error obteniendo componentes: ' . $e->getMessage()
+        ]);
+        exit;
     }
 }
 
-function getLugares() {
-    global $conexion;
+// NUEVO: Endpoint para obtener componentes actuales de un activo específico
+if ($_SERVER["REQUEST_METHOD"] === "GET" && isset($_GET['action']) && $_GET['action'] === 'get_componentes_activo') {
+    $id_activo = (int)($_GET['id_activo'] ?? 0);
+    $tipo = $_GET['tipo'] ?? '';
+    
+    if (empty($tipo) || $id_activo <= 0) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'Parámetros inválidos']);
+        exit;
+    }
     
     try {
-        $sql = "SELECT * FROM lugar_reparacion ORDER BY nombre_lugar";
-        $stmt = sqlsrv_query($conexion, $sql);
+        // NUEVO: Log de debug
+        error_log("DEBUG: Obteniendo slots para activo $id_activo, tipo $tipo");
         
-        if (!$stmt) {
-            $errors = sqlsrv_errors();
-            throw new Exception('Error al obtener lugares: ' . json_encode($errors));
+        $componentes = [];
+        
+        // Mapear tipo de componente a tipo de slot
+        $tipo_slot_map = [
+            'procesador' => 'PROCESADOR',
+            'ram' => 'RAM',
+            'almacenamiento' => 'ALMACENAMIENTO',
+            'tarjeta_video' => 'TARJETA_VIDEO'
+        ];
+        
+        if (!isset($tipo_slot_map[$tipo])) {
+            throw new Exception("Tipo de componente no válido: $tipo");
         }
         
-        $lugares = [];
+        $tipo_slot = $tipo_slot_map[$tipo];
+        
+        // NUEVO: Verificar primero que el activo existe
+        $sql_verificar_activo = "SELECT COUNT(*) as count FROM activo WHERE id_activo = ?";
+        $stmt_verificar_activo = sqlsrv_query($conn, $sql_verificar_activo, [$id_activo]);
+        $row_activo = sqlsrv_fetch_array($stmt_verificar_activo, SQLSRV_FETCH_ASSOC);
+        
+        if ($row_activo['count'] == 0) {
+            throw new Exception("El activo no existe");
+        }
+        
+        error_log("DEBUG: Activo verificado, buscando slots de tipo $tipo_slot");
+        
+        // CORREGIDO: Consultar TODOS los slots del activo para el tipo específico (ocupados Y disponibles)
+        switch ($tipo) {
+            case 'procesador':
+                $sql = "
+                    SELECT 
+                        sa.id_slot,
+                        sa.estado,
+                        CASE 
+                            WHEN sa.estado = 'disponible' THEN 'Slot disponible'
+                            WHEN sap.id_procesador IS NOT NULL THEN 
+                                CONCAT(ISNULL(m.nombre + ' ', ''), p.modelo, ISNULL(' ' + p.generacion, ''))
+                            WHEN sap.id_procesador_generico IS NOT NULL THEN 
+                                CONCAT(pg.modelo, ISNULL(' ' + pg.generacion, ''))
+                            ELSE 'Slot con componente desconocido'
+                        END as descripcion,
+                        CASE 
+                            WHEN sa.estado = 'disponible' THEN 'disponible'
+                            WHEN sap.id_procesador IS NOT NULL THEN 'detallado'
+                            WHEN sap.id_procesador_generico IS NOT NULL THEN 'generico'
+                            ELSE 'desconocido'
+                        END as tipo,
+                        CASE 
+                            WHEN sap.id_procesador IS NOT NULL THEN sap.id_procesador
+                            WHEN sap.id_procesador_generico IS NOT NULL THEN sap.id_procesador_generico
+                            ELSE NULL
+                        END as componente_id
+                    FROM slot_activo sa
+                    LEFT JOIN slot_activo_procesador sap ON sa.id_slot = sap.id_slot
+                    LEFT JOIN procesador p ON sap.id_procesador = p.id_procesador
+                    LEFT JOIN marca m ON p.id_marca = m.id_marca
+                    LEFT JOIN procesador_generico pg ON sap.id_procesador_generico = pg.id_procesador_generico
+                    WHERE sa.id_activo = ? AND sa.tipo_slot = ?
+                    ORDER BY sa.estado DESC, sa.id_slot";
+                break;
+                
+            case 'ram':
+                $sql = "
+                    SELECT 
+                        sa.id_slot,
+                        sa.estado,
+                        CASE 
+                            WHEN sa.estado = 'disponible' THEN 'Slot disponible'
+                            WHEN sar.id_ram IS NOT NULL THEN 
+                                CONCAT(r.capacidad, ISNULL(' ' + r.tipo, ''), ISNULL(' (' + mr.nombre + ')', ''))
+                            WHEN sar.id_ram_generico IS NOT NULL THEN 
+                                rg.capacidad
+                            ELSE 'Slot con componente desconocido'
+                        END as descripcion,
+                        CASE 
+                            WHEN sa.estado = 'disponible' THEN 'disponible'
+                            WHEN sar.id_ram IS NOT NULL THEN 'detallado'
+                            WHEN sar.id_ram_generico IS NOT NULL THEN 'generico'
+                            ELSE 'desconocido'
+                        END as tipo,
+                        CASE 
+                            WHEN sar.id_ram IS NOT NULL THEN sar.id_ram
+                            WHEN sar.id_ram_generico IS NOT NULL THEN sar.id_ram_generico
+                            ELSE NULL
+                        END as componente_id
+                    FROM slot_activo sa
+                    LEFT JOIN slot_activo_ram sar ON sa.id_slot = sar.id_slot
+                    LEFT JOIN RAM r ON sar.id_ram = r.id_ram
+                    LEFT JOIN marca mr ON r.id_marca = mr.id_marca
+                    LEFT JOIN RAM_generico rg ON sar.id_ram_generico = rg.id_ram_generico
+                    WHERE sa.id_activo = ? AND sa.tipo_slot = ?
+                    ORDER BY sa.estado DESC, sa.id_slot";
+                break;
+                
+            case 'almacenamiento':
+                $sql = "
+                    SELECT 
+                        sa.id_slot,
+                        sa.estado,
+                        CASE 
+                            WHEN sa.estado = 'disponible' THEN 'Slot disponible'
+                            WHEN saa.id_almacenamiento IS NOT NULL THEN 
+                                CONCAT(st.capacidad, ISNULL(' ' + st.tipo, ''), ISNULL(' (' + ms.nombre + ')', ''))
+                            WHEN saa.id_almacenamiento_generico IS NOT NULL THEN 
+                                CONCAT(sg.capacidad, ISNULL(' ' + sg.tipo, ''))
+                            ELSE 'Slot con componente desconocido'
+                        END as descripcion,
+                        CASE 
+                            WHEN sa.estado = 'disponible' THEN 'disponible'
+                            WHEN saa.id_almacenamiento IS NOT NULL THEN 'detallado'
+                            WHEN saa.id_almacenamiento_generico IS NOT NULL THEN 'generico'
+                            ELSE 'desconocido'
+                        END as tipo,
+                        CASE 
+                            WHEN saa.id_almacenamiento IS NOT NULL THEN saa.id_almacenamiento
+                            WHEN saa.id_almacenamiento_generico IS NOT NULL THEN saa.id_almacenamiento_generico
+                            ELSE NULL
+                        END as componente_id
+                    FROM slot_activo sa
+                    LEFT JOIN slot_activo_almacenamiento saa ON sa.id_slot = saa.id_slot
+                    LEFT JOIN almacenamiento st ON saa.id_almacenamiento = st.id_almacenamiento
+                    LEFT JOIN marca ms ON st.id_marca = ms.id_marca
+                    LEFT JOIN almacenamiento_generico sg ON saa.id_almacenamiento_generico = sg.id_almacenamiento_generico
+                    WHERE sa.id_activo = ? AND sa.tipo_slot = ?
+                    ORDER BY sa.estado DESC, sa.id_slot";
+                break;
+                
+            case 'tarjeta_video':
+                $sql = "
+                    SELECT 
+                        sa.id_slot,
+                        sa.estado,
+                        CASE 
+                            WHEN sa.estado = 'disponible' THEN 'Slot disponible'
+                            WHEN satv.id_tarjeta_video IS NOT NULL THEN 
+                                CONCAT(ISNULL(mtv.nombre + ' ', ''), tv.modelo, ISNULL(' ' + tv.memoria, ''))
+                            WHEN satv.id_tarjeta_video_generico IS NOT NULL THEN 
+                                CONCAT(tvg.modelo, ISNULL(' ' + tvg.memoria, ''))
+                            ELSE 'Slot con componente desconocido'
+                        END as descripcion,
+                        CASE 
+                            WHEN sa.estado = 'disponible' THEN 'disponible'
+                            WHEN satv.id_tarjeta_video IS NOT NULL THEN 'detallado'
+                            WHEN satv.id_tarjeta_video_generico IS NOT NULL THEN 'generico'
+                            ELSE 'desconocido'
+                        END as tipo,
+                        CASE 
+                            WHEN satv.id_tarjeta_video IS NOT NULL THEN satv.id_tarjeta_video
+                            WHEN satv.id_tarjeta_video_generico IS NOT NULL THEN satv.id_tarjeta_video_generico
+                            ELSE NULL
+                        END as componente_id
+                    FROM slot_activo sa
+                    LEFT JOIN slot_activo_tarjeta_video satv ON sa.id_slot = satv.id_slot
+                    LEFT JOIN tarjeta_video tv ON satv.id_tarjeta_video = tv.id_tarjeta_video
+                    LEFT JOIN marca mtv ON tv.id_marca = mtv.id_marca
+                    LEFT JOIN tarjeta_video_generico tvg ON satv.id_tarjeta_video_generico = tvg.id_tarjeta_video_generico
+                    WHERE sa.id_activo = ? AND sa.tipo_slot = ?
+                    ORDER BY sa.estado DESC, sa.id_slot";
+                break;
+                
+            default:
+                throw new Exception("Tipo de componente no soportado: $tipo");
+        }
+        
+        $stmt = sqlsrv_query($conn, $sql, [$id_activo, $tipo_slot]);
+        
+        if ($stmt === false) {
+            $errors = print_r(sqlsrv_errors(), true);
+            error_log("DEBUG: Error en consulta: $errors");
+            throw new Exception("Error en consulta de componentes actuales: $errors");
+        }
+        
+        $count = 0;
         while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-            $lugares[] = $row;
+            $count++;
+            $componentes[] = [
+                'id_slot' => $row['id_slot'],
+                'descripcion' => $row['descripcion'],
+                'tipo' => $row['tipo'],
+                'componente_id' => $row['componente_id'],
+                'estado' => $row['estado']
+            ];
+            
+            error_log("DEBUG: Slot encontrado - ID: {$row['id_slot']}, Estado: {$row['estado']}, Descripción: {$row['descripcion']}");
         }
         
-        sendJsonResponse($lugares);
+        error_log("DEBUG: Total de slots encontrados: $count");
+        
+        header('Content-Type: application/json');
+        echo json_encode($componentes);
+        exit;
         
     } catch (Exception $e) {
-        logError("Error en getLugares: " . $e->getMessage());
-        sendJsonResponse(['success' => false, 'message' => 'Error obteniendo lugares: ' . $e->getMessage()]);
+        error_log("ERROR obteniendo componentes actuales del activo: " . $e->getMessage());
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false, 
+            'error' => 'Error obteniendo componentes del activo: ' . $e->getMessage()
+        ]);
+        exit;
     }
 }
 
-function getEstados() {
-    global $conexion;
+// CORREGIDO: Endpoint para obtener cambios de hardware con AMBOS tipos de componentes
+if ($_SERVER["REQUEST_METHOD"] === "GET" && isset($_GET['action']) && $_GET['action'] === 'get_cambios_hardware') {
+    $id_reparacion = (int)($_GET['id_reparacion'] ?? 0);
+    
+    if ($id_reparacion <= 0) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'ID de reparación inválido']);
+        exit;
+    }
     
     try {
-        $sql = "SELECT * FROM estado_reparacion ORDER BY nombre_estado";
-        $stmt = sqlsrv_query($conexion, $sql);
-        
-        if (!$stmt) {
-            $errors = sqlsrv_errors();
-            throw new Exception('Error al obtener estados: ' . json_encode($errors));
-        }
-        
-        $estados = [];
-        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-            $estados[] = $row;
-        }
-        
-        sendJsonResponse($estados);
-        
-    } catch (Exception $e) {
-        logError("Error en getEstados: " . $e->getMessage());
-        sendJsonResponse(['success' => false, 'message' => 'Error obteniendo estados: ' . $e->getMessage()]);
-    }
-}
-
-function getTiposCambio() {
-    global $conexion;
-    
-    try {
-        $sql = "SELECT * FROM tipo_cambio ORDER BY nombre_tipo_cambio";
-        $stmt = sqlsrv_query($conexion, $sql);
-        
-        if (!$stmt) {
-            $errors = sqlsrv_errors();
-            throw new Exception('Error al obtener tipos de cambio: ' . json_encode($errors));
-        }
-        
-        $tipos = [];
-        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-            $tipos[] = $row;
-        }
-        
-        sendJsonResponse($tipos);
-        
-    } catch (Exception $e) {
-        logError("Error en getTiposCambio: " . $e->getMessage());
-        sendJsonResponse(['success' => false, 'message' => 'Error obteniendo tipos de cambio: ' . $e->getMessage()]);
-    }
-}
-
-function getCambiosHardware($idReparacion) {
-    global $conexion;
-    
-    $sql = "SELECT ch.*, tc.nombre_tipo_cambio,
-                   CASE 
-                       WHEN ch.id_procesador IS NOT NULL THEN 'Procesador'
-                       WHEN ch.id_ram IS NOT NULL THEN 'RAM'
-                       WHEN ch.id_almacenamiento IS NOT NULL THEN 'Almacenamiento'
-                       WHEN ch.id_tarjeta_video IS NOT NULL THEN 'Tarjeta de Video'
-                   END as tipo_componente,
-                   CASE 
-                       WHEN ch.id_procesador IS NOT NULL THEN CONCAT(p.modelo, ' ', p.generacion)
-                       WHEN ch.id_ram IS NOT NULL THEN CONCAT(r.capacidad, ' ', r.tipo)
-                       WHEN ch.id_almacenamiento IS NOT NULL THEN CONCAT(a.capacidad, ' ', a.tipo)
-                       WHEN ch.id_tarjeta_video IS NOT NULL THEN CONCAT(tv.modelo, ' ', tv.memoria)
-                   END as componente_nuevo
+        $sql = "
+            SELECT 
+                ch.id_cambio_hardware,
+                ch.fecha,
+                ch.motivo,
+                ch.costo,
+                ch.componente_retirado,
+                tc.nombre_tipo_cambio,
+                -- Determinar tipo y descripción del componente nuevo (AMBOS tipos)
+                CASE 
+                    WHEN ch.id_procesador IS NOT NULL THEN 'Procesador (Detallado)'
+                    WHEN ch.id_procesador_generico IS NOT NULL THEN 'Procesador (Genérico)'
+                    WHEN ch.id_ram IS NOT NULL THEN 'RAM (Detallada)'
+                    WHEN ch.id_ram_generico IS NOT NULL THEN 'RAM (Genérica)'
+                    WHEN ch.id_almacenamiento IS NOT NULL THEN 'Almacenamiento (Detallado)'
+                    WHEN ch.id_almacenamiento_generico IS NOT NULL THEN 'Almacenamiento (Genérico)'
+                    WHEN ch.id_tarjeta_video IS NOT NULL THEN 'Tarjeta de Video (Detallada)'
+                    WHEN ch.id_tarjeta_video_generico IS NOT NULL THEN 'Tarjeta de Video (Genérica)'
+                    ELSE 'Desconocido'
+                END as tipo_componente,
+                -- CORREGIDO: Mostrar información del componente nuevo (detallados Y genéricos)
+                CASE 
+                    -- Componentes detallados
+                    WHEN ch.id_procesador IS NOT NULL THEN 
+                        ISNULL((SELECT CONCAT(ISNULL(m.nombre + ' ', ''), p.modelo) FROM procesador p LEFT JOIN marca m ON p.id_marca = m.id_marca WHERE p.id_procesador = ch.id_procesador), 'Procesador detallado ID: ' + CAST(ch.id_procesador as VARCHAR))
+                    WHEN ch.id_ram IS NOT NULL THEN 
+                        ISNULL((SELECT CONCAT(r.capacidad, ISNULL(' ' + r.tipo, '')) FROM RAM r WHERE r.id_ram = ch.id_ram), 'RAM detallada ID: ' + CAST(ch.id_ram as VARCHAR))
+                    WHEN ch.id_almacenamiento IS NOT NULL THEN 
+                        ISNULL((SELECT CONCAT(a.capacidad, ISNULL(' ' + a.tipo, '')) FROM almacenamiento a WHERE a.id_almacenamiento = ch.id_almacenamiento), 'Almacenamiento detallado ID: ' + CAST(ch.id_almacenamiento as VARCHAR))
+                    WHEN ch.id_tarjeta_video IS NOT NULL THEN 
+                        ISNULL((SELECT CONCAT(tv.modelo, ISNULL(' ' + tv.memoria, '')) FROM tarjeta_video tv WHERE tv.id_tarjeta_video = ch.id_tarjeta_video), 'Tarjeta Video detallada ID: ' + CAST(ch.id_tarjeta_video as VARCHAR))
+                    -- NUEVO: Componentes genéricos
+                    WHEN ch.id_procesador_generico IS NOT NULL THEN 
+                        ISNULL((SELECT modelo FROM procesador_generico WHERE id_procesador_generico = ch.id_procesador_generico), 'Procesador genérico ID: ' + CAST(ch.id_procesador_generico as VARCHAR))
+                    WHEN ch.id_ram_generico IS NOT NULL THEN 
+                        ISNULL((SELECT capacidad FROM RAM_generico WHERE id_ram_generico = ch.id_ram_generico), 'RAM genérica ID: ' + CAST(ch.id_ram_generico as VARCHAR))
+                    WHEN ch.id_almacenamiento_generico IS NOT NULL THEN 
+                        ISNULL((SELECT CONCAT(capacidad, ISNULL(' ' + tipo, '')) FROM almacenamiento_generico WHERE id_almacenamiento_generico = ch.id_almacenamiento_generico), 'Almacenamiento genérico ID: ' + CAST(ch.id_almacenamiento_generico as VARCHAR))
+                    WHEN ch.id_tarjeta_video_generico IS NOT NULL THEN 
+                        ISNULL((SELECT CONCAT(modelo, ISNULL(' ' + memoria, '')) FROM tarjeta_video_generico WHERE id_tarjeta_video_generico = ch.id_tarjeta_video_generico), 'Tarjeta Video genérica ID: ' + CAST(ch.id_tarjeta_video_generico as VARCHAR))
+                    ELSE 'Sin componente registrado'
+                END as componente_nuevo,
+                -- Mostrar fecha formateada
+                FORMAT(ch.fecha, 'dd/MM/yyyy') as fecha_formateada
             FROM cambio_hardware ch
             LEFT JOIN tipo_cambio tc ON ch.id_tipo_cambio = tc.id_tipo_cambio
-            LEFT JOIN procesador p ON ch.id_procesador = p.id_procesador
-            LEFT JOIN RAM r ON ch.id_ram = r.id_ram
-            LEFT JOIN almacenamiento a ON ch.id_almacenamiento = a.id_almacenamiento
-            LEFT JOIN tarjeta_video tv ON ch.id_tarjeta_video = tv.id_tarjeta_video
             WHERE ch.id_reparacion = ?
-            ORDER BY ch.fecha DESC";
-    
-    $stmt = sqlsrv_prepare($conexion, $sql, [$idReparacion]);
-    
-    if (!$stmt || !sqlsrv_execute($stmt)) {
-        throw new Exception('Error al obtener cambios de hardware');
-    }
-    
-    $cambios = [];
-    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-        if ($row['fecha']) {
-            $row['fecha'] = $row['fecha']->format('Y-m-d');
+            ORDER BY ch.fecha DESC
+        ";
+        
+        $stmt = sqlsrv_query($conn, $sql, [$id_reparacion]);
+        
+        if ($stmt === false) {
+            throw new Exception("Error en consulta de cambios de hardware: " . print_r(sqlsrv_errors(), true));
         }
-        $cambios[] = $row;
+        
+        $cambios = [];
+        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+            // Formatear fecha si es un objeto DateTime
+            if ($row['fecha'] instanceof DateTime) {
+                $row['fecha'] = $row['fecha']->format('Y-m-d');
+            }
+            $cambios[] = $row;
+        }
+        
+        header('Content-Type: application/json');
+        echo json_encode($cambios);
+        exit;
+        
+    } catch (Exception $e) {
+        error_log("Error obteniendo cambios de hardware: " . $e->getMessage());
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false, 
+            'error' => 'Error obteniendo cambios de hardware: ' . $e->getMessage()
+        ]);
+        exit;
     }
-    
-    echo json_encode($cambios);
-}
-
-function createCambioHardware() {
-    global $conexion;
-    
-    $id_activo = $_POST['id_activo'];
-    $id_reparacion = $_POST['id_reparacion'];
-    $id_tipo_cambio = $_POST['id_tipo_cambio'];
-    $tipo_componente = $_POST['tipo_componente'];
-    $fecha = date('Y-m-d');
-    $motivo = $_POST['motivo'] ?? null;
-    $costo = !empty($_POST['costo']) ? $_POST['costo'] : null;
-    $componente_retirado = $_POST['componente_retirado'] ?? null;
-    
-    // Preparar campos de componente
-    $id_procesador = null;
-    $id_ram = null;
-    $id_almacenamiento = null;
-    $id_tarjeta_video = null;
-    
-    switch ($tipo_componente) {
-        case 'procesador':
-            $id_procesador = !empty($_POST['id_componente']) ? $_POST['id_componente'] : null;
-            break;
-        case 'ram':
-            $id_ram = !empty($_POST['id_componente']) ? $_POST['id_componente'] : null;
-            break;
-        case 'almacenamiento':
-            $id_almacenamiento = !empty($_POST['id_componente']) ? $_POST['id_componente'] : null;
-            break;
-        case 'tarjeta_video':
-            $id_tarjeta_video = !empty($_POST['id_componente']) ? $_POST['id_componente'] : null;
-            break;
-    }
-    
-    $sql = "INSERT INTO cambio_hardware (id_activo, id_reparacion, id_procesador, id_ram, id_almacenamiento, id_tarjeta_video, id_tipo_cambio, fecha, motivo, costo, componente_retirado) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    
-    $params = [$id_activo, $id_reparacion, $id_procesador, $id_ram, $id_almacenamiento, $id_tarjeta_video, $id_tipo_cambio, $fecha, $motivo, $costo, $componente_retirado];
-    $stmt = sqlsrv_prepare($conexion, $sql, $params);
-    
-    if (!$stmt || !sqlsrv_execute($stmt)) {
-        throw new Exception('Error al crear cambio de hardware');
-    }
-    
-    echo json_encode(['success' => true, 'message' => 'Cambio de hardware registrado exitosamente']);
-}
-
-function deleteCambioHardware($id) {
-    global $conexion;
-    
-    $sql = "DELETE FROM cambio_hardware WHERE id_cambio_hardware = ?";
-    $stmt = sqlsrv_prepare($conexion, $sql, [$id]);
-    
-    if (!$stmt || !sqlsrv_execute($stmt)) {
-        throw new Exception('Error al eliminar cambio de hardware');
-    }
-    
-    echo json_encode(['success' => true, 'message' => 'Cambio de hardware eliminado exitosamente']);
-}
-
-function getComponentes($tipo) {
-    global $conexion;
-    
-    switch ($tipo) {
-        case 'procesador':
-            $sql = "SELECT id_procesador as id, CONCAT(modelo, ' ', generacion) as descripcion FROM procesador ORDER BY modelo";
-            break;
-        case 'ram':
-            $sql = "SELECT id_ram as id, CONCAT(capacidad, ' ', tipo) as descripcion FROM RAM ORDER BY capacidad";
-            break;
-        case 'almacenamiento':
-            $sql = "SELECT id_almacenamiento as id, CONCAT(capacidad, ' ', tipo) as descripcion FROM almacenamiento ORDER BY capacidad";
-            break;
-        case 'tarjeta_video':
-            $sql = "SELECT id_tarjeta_video as id, CONCAT(modelo, ' ', memoria) as descripcion FROM tarjeta_video ORDER BY modelo";
-            break;
-        default:
-            throw new Exception('Tipo de componente no válido');
-    }
-    
-    $stmt = sqlsrv_query($conexion, $sql);
-    if (!$stmt) {
-        throw new Exception('Error al obtener componentes');
-    }
-    
-    $componentes = [];
-    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-        $componentes[] = $row;
-    }
-    
-    echo json_encode($componentes);
 }
 ?>
+
