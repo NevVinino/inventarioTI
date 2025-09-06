@@ -18,8 +18,17 @@ if($_SERVER["REQUEST_METHOD"] === "POST") {
         $sql = "UPDATE RAM SET capacidad = ?, id_marca = ?, tipo = ?, frecuencia = ?, serial_number = ? WHERE id_ram = ?";
         $params = [$capacidad, $id_marca, $tipo, $frecuencia, $serial_number, $id_ram];
     } elseif ($accion === "eliminar" && !empty($id_ram)) {
-        $sql = "DELETE FROM ram WHERE id_ram = ?";
-        $params = [$id_ram];
+        // Eliminar registros relacionados en slot_activo_ram
+        $sqlRelacionados = "DELETE FROM slot_activo_ram WHERE id_ram = ?";
+        $stmtRelacionados = sqlsrv_query($conn, $sqlRelacionados, [$id_ram]);
+
+        if ($stmtRelacionados) {
+            // Eliminar el registro principal en RAM
+            $sql = "DELETE FROM ram WHERE id_ram = ?";
+            $params = [$id_ram];
+        } else {
+            die("Error al eliminar registros relacionados:<br>" . print_r(sqlsrv_errors(), true));
+        }
     } else {
         die("Acción no válida o faltan datos.");
     }

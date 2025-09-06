@@ -3,7 +3,7 @@ include("../includes/conexion.php");
 $solo_admin = true;
 include("../includes/verificar_acceso.php");
 
-// Obtener reparaciones
+// CORREGIDO: Obtener reparaciones con nombres de campos correctos de la BD
 $sqlReparaciones = "SELECT r.*, 
                            CASE 
                                WHEN a.id_laptop IS NOT NULL THEN ISNULL(l.nombreEquipo, 'Sin nombre')
@@ -35,7 +35,7 @@ $sqlReparaciones = "SELECT r.*,
                     ORDER BY r.fecha DESC";
 $reparaciones = sqlsrv_query($conn, $sqlReparaciones);
 
-// Obtener catálogos
+// CORREGIDO: Obtener catálogos con nombres de campos correctos de la BD
 $sqlActivos = "SELECT a.id_activo, a.tipo_activo,
                       CASE 
                           WHEN a.id_laptop IS NOT NULL THEN ISNULL(l.nombreEquipo, 'Sin nombre')
@@ -100,14 +100,17 @@ $estados = sqlsrv_query($conn, $sqlEstados);
             </thead>
             <tbody>
                 <?php $counter = 1; ?>
-                <?php while ($r = sqlsrv_fetch_array($reparaciones, SQLSRV_FETCH_ASSOC)) { ?>
+                <?php while ($r = sqlsrv_fetch_array($reparaciones, SQLSRV_FETCH_ASSOC)) { 
+                    // NUEVO: Debug del tiempo de inactividad
+                    error_log("DEBUG PHP: ID Reparación: {$r['id_reparacion']}, Tiempo inactividad: " . var_export($r['tiempo_inactividad'], true) . " (Tipo: " . gettype($r['tiempo_inactividad']) . ")");
+                ?>
                     <tr>
                         <td><?= $counter++ ?></td>
                         <td><?= htmlspecialchars($r["nombre_equipo"]) ?></td>
                         <td><?= $r["fecha"] ? $r["fecha"]->format('d/m/Y') : 'Sin fecha' ?></td>
                         <td><?= htmlspecialchars($r["nombre_estado"]) ?></td>
                         <td><?= htmlspecialchars($r["nombre_lugar"]) ?></td>
-                        <td><?= $r["costo"] ? '$/ ' . number_format($r["costo"], 2) : '-' ?></td>
+                        <td><?= $r["costo"] ? 'S/ ' . number_format($r["costo"], 2) : '-' ?></td>
                         <td>
                             <div class="acciones">
                                 <!-- Botón ver -->
@@ -117,7 +120,10 @@ $estados = sqlsrv_query($conn, $sqlEstados);
                                     data-nombre-estado="<?= htmlspecialchars($r['nombre_estado']) ?>"
                                     data-nombre-lugar="<?= htmlspecialchars($r['nombre_lugar']) ?>"
                                     data-costo="<?= $r['costo'] ?>"
-                                    data-tiempo-inactividad="<?= $r['tiempo_inactividad'] ?>"
+                                    data-tiempo-inactividad="<?= 
+                                        // CORREGIDO: Manejo más específico del tiempo de inactividad
+                                        $r['tiempo_inactividad'] !== null ? (string)$r['tiempo_inactividad'] : ''
+                                    ?>"
                                     data-nombre-equipo="<?= htmlspecialchars($r['nombre_equipo']) ?>"
                                     data-tipo-activo="<?= htmlspecialchars($r['tipo_activo']) ?>"
                                     data-id-activo="<?= $r['id_activo'] ?>"
@@ -135,7 +141,10 @@ $estados = sqlsrv_query($conn, $sqlEstados);
                                     data-fecha="<?= $r['fecha'] ? $r['fecha']->format('Y-m-d') : '' ?>"
                                     data-descripcion="<?= htmlspecialchars($r['descripcion'] ?? '') ?>"
                                     data-costo="<?= $r['costo'] ?>"
-                                    data-tiempo="<?= $r['tiempo_inactividad'] ?>">
+                                    data-tiempo="<?= 
+                                        // CORREGIDO: Manejo más específico del tiempo de inactividad para edición
+                                        $r['tiempo_inactividad'] !== null ? (string)$r['tiempo_inactividad'] : ''
+                                    ?>">
                                     <img src="../../img/editar.png" alt="Editar">
                                 </button>
                                                               
@@ -179,8 +188,14 @@ $estados = sqlsrv_query($conn, $sqlEstados);
                         <?php } ?>
                     </select>
 
+                    <!-- CORREGIDO: Mejorar el input de fecha -->
                     <label>Fecha *</label>
-                    <input type="date" name="fecha" id="fecha" required>
+                    <input type="date" 
+                           name="fecha" 
+                           id="fecha" 
+                           required 
+                           max="<?= date('Y-m-d') ?>"
+                           title="Seleccione la fecha de la reparación (no puede ser futura)">
 
                     <label>Lugar de Reparación *</label>
                     <select name="id_lugar_reparacion" id="id_lugar_reparacion" required>
@@ -199,10 +214,11 @@ $estados = sqlsrv_query($conn, $sqlEstados);
                     </select>
 
                     <label>Costo de Reparacion</label>
-                    <input type="number" step="0.01" name="costo" id="costo" min="0">
+                    <input type="number" step="0.01" name="costo" id="costo" min="0" placeholder="0.00">
 
+                    <!-- CORREGIDO: Agregar validación min="0" para tiempo de inactividad -->
                     <label>Días de Inactividad</label>
-                    <input type="number" name="tiempo_inactividad" id="tiempo_inactividad" min="0">
+                    <input type="number" name="tiempo_inactividad" id="tiempo_inactividad" min="0" placeholder="0">
 
                     <label>Descripción</label>
                     <textarea name="descripcion" id="descripcion" rows="3"></textarea>
@@ -331,7 +347,6 @@ $estados = sqlsrv_query($conn, $sqlEstados);
                                     <option value="1">Reemplazo</option>
                                     <option value="2">Adición</option>
                                     <option value="3">Retiro</option>
-                                    <option value="4">Actualización</option>
                                 </select>
                                 <small class="form-help">Solo en "Reemplazo" podrá seleccionar un componente actual</small>
                             </div>
@@ -350,11 +365,14 @@ $estados = sqlsrv_query($conn, $sqlEstados);
                         
                         <div class="form-row">
                             <div class="form-group">
-                                <label>Componente a Reemplazar</label>
+                                <label>Componente a Reemplazar/Slot</label>
                                 <select name="componente_actual" id="componenteActual" disabled>
-                                    <option value="">Seleccione primero "Reemplazo" como tipo de cambio</option>
+                                    <option value="">Seleccione primero un tipo de cambio</option>
                                 </select>
-                                <small class="form-help">Solo disponible para tipo de cambio "Reemplazo"</small>
+                                <small class="form-help">
+                                    • <strong>Reemplazo/Retiro:</strong> Solo se muestran slots ocupados<br>
+                                    • <strong>Adición:</strong> Solo se muestran slots disponibles
+                                </small>
                             </div>
                             
                             <div class="form-group">
@@ -451,10 +469,7 @@ $estados = sqlsrv_query($conn, $sqlEstados);
         </template>
     </div>
 
-    <script src="../../js/admin/crud_reparacion.js"></script>
+    <script type="module" src="../../js/admin/crud_reparacion.js"></script>
 </body>
-
 </html>
-</body>
-
 </html>

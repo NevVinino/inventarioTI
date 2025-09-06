@@ -73,22 +73,49 @@ if($_SERVER["REQUEST_METHOD"] === "POST") {
             sqlsrv_begin_transaction($conn);
             
             // MEJORADO: Validación específica para tipo de cambio
-            if ($id_tipo_cambio === '1') { // Reemplazo
+            if ($id_tipo_cambio === '1' || $id_tipo_cambio === '3') { // Reemplazo o Retiro
                 if (empty($componente_actual)) {
-                    throw new Exception("Para un reemplazo debe seleccionar el componente actual");
+                    $tipoTexto = $id_tipo_cambio === '1' ? 'reemplazo' : 'retiro';
+                    throw new Exception("Para un $tipoTexto debe seleccionar el componente actual");
                 }
                 
-                // CORREGIDO: Verificar que el slot existe y pertenece al activo (sin importar el estado)
-                $sql_verificar = "SELECT COUNT(*) as count FROM slot_activo WHERE id_slot = ? AND id_activo = ?";
+                // CORREGIDO: Verificar que el slot existe, pertenece al activo Y está ocupado
+                $sql_verificar = "SELECT estado FROM slot_activo WHERE id_slot = ? AND id_activo = ?";
                 $stmt_verificar = sqlsrv_query($conn, $sql_verificar, [$componente_actual, $id_activo]);
                 $row_verificar = sqlsrv_fetch_array($stmt_verificar, SQLSRV_FETCH_ASSOC);
                 
-                if ($row_verificar['count'] == 0) {
+                if (!$row_verificar) {
                     throw new Exception("El slot seleccionado no existe o no pertenece a este activo");
                 }
                 
-                // NUEVO: Log de debug para verificar los datos
-                error_log("DEBUG: Validando slot - ID Slot: $componente_actual, ID Activo: $id_activo, Count: " . $row_verificar['count']);
+                // NUEVO: Validar que el slot esté ocupado para reemplazo/retiro
+                if ($row_verificar['estado'] !== 'ocupado') {
+                    $tipoTexto = $id_tipo_cambio === '1' ? 'reemplazar' : 'retirar';
+                    throw new Exception("No se puede $tipoTexto un slot disponible. Solo se pueden $tipoTexto componentes que estén actualmente instalados.");
+                }
+                
+                error_log("DEBUG: Validando slot ocupado - ID Slot: $componente_actual, ID Activo: $id_activo, Estado: " . $row_verificar['estado']);
+                
+            } elseif ($id_tipo_cambio === '2') { // Adición
+                if (empty($componente_actual)) {
+                    throw new Exception("Para una adición debe seleccionar un slot disponible");
+                }
+                
+                // NUEVO: Verificar que el slot existe, pertenece al activo Y está disponible
+                $sql_verificar = "SELECT estado FROM slot_activo WHERE id_slot = ? AND id_activo = ?";
+                $stmt_verificar = sqlsrv_query($conn, $sql_verificar, [$componente_actual, $id_activo]);
+                $row_verificar = sqlsrv_fetch_array($stmt_verificar, SQLSRV_FETCH_ASSOC);
+                
+                if (!$row_verificar) {
+                    throw new Exception("El slot seleccionado no existe o no pertenece a este activo");
+                }
+                
+                // NUEVO: Validar que el slot esté disponible para adición
+                if ($row_verificar['estado'] !== 'disponible') {
+                    throw new Exception("No se puede agregar un componente a un slot ocupado. Solo se pueden usar slots disponibles para adición.");
+                }
+                
+                error_log("DEBUG: Validando slot disponible - ID Slot: $componente_actual, ID Activo: $id_activo, Estado: " . $row_verificar['estado']);
             }
             
             // NUEVO: Validar costo si se proporciona
@@ -531,27 +558,92 @@ if($_SERVER["REQUEST_METHOD"] === "POST") {
     $costo = null;
     if (isset($_POST["costo"]) && $_POST["costo"] !== '') {
         $costo = floatval($_POST["costo"]);
+        // Validar que el costo no sea negativo
+        if ($costo < 0) {
+            die("❌ Error: El costo no puede ser negativo.");
+        }
     }
     
-    // CORREGIDO: Manejar tiempo_inactividad para permitir el valor 0
+    // CORREGIDO: Manejar tiempo_inactividad para permitir el valor 0 y validar negativos
     $tiempo_inactividad = null;
     if (isset($_POST["tiempo_inactividad"]) && $_POST["tiempo_inactividad"] !== '') {
         $tiempo_inactividad = (int)$_POST["tiempo_inactividad"];
+        // Validar que el tiempo de inactividad no sea negativo
+        if ($tiempo_inactividad < 0) {
+            die("❌ Error: El tiempo de inactividad no puede ser negativo.");
+        }
     }
     
+    // CORREGIDO: Mejorar manejo de fechas para SQL Server
     $fecha = $_POST["fecha"] ?? '';
+    if (!empty($fecha)) {
+        // Log de debug para ver qué fecha recibimos
+        error_log("DEBUG: Fecha recibida del formulario: " . $fecha);
+        
+        // Validar formato de fecha Y-m-d
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha)) {
+            die("❌ Error: Formato de fecha inválido. Use YYYY-MM-DD");
+        }
+        
+        // Crear objeto DateTime desde la fecha recibida
+        $fechaObj = DateTime::createFromFormat('Y-m-d', $fecha);
+        
+        if ($fechaObj === false) {
+            error_log("DEBUG: Error al crear DateTime desde: " . $fecha);
+            die("❌ Error: No se pudo procesar la fecha proporcionada.");
+        }
+        
+        // Validar que la fecha no sea futura
+        $hoy = new DateTime();
+        $hoy->setTime(0, 0, 0); // Establecer a medianoche para comparar solo fechas
+        
+        if ($fechaObj > $hoy) {
+            die("❌ Error: La fecha de reparación no puede ser posterior a hoy.");
+        }
+        
+        // NUEVO: Formatear la fecha específicamente para SQL Server usando el formato ISO 8601 completo
+        $fecha_sql = $fechaObj->format('Y-m-d\TH:i:s.v');
+        
+        error_log("DEBUG: Fecha formateada para SQL Server: " . $fecha_sql);
+        
+        // Alternativamente, usar formato simple que SQL Server entienda mejor
+        $fecha = $fechaObj->format('Y-m-d');
+        
+        error_log("DEBUG: Fecha final para enviar a BD: " . $fecha);
+    }
+    
     $id_reparacion = $_POST["id_reparacion"] ?? '';
     $id_usuario = $_SESSION['id_usuario'] ?? 1;
 
     if ($accion === "crear") {
+        // CORREGIDO: Validaciones adicionales para crear
+        if (empty($fecha)) {
+            die("❌ Error: La fecha es obligatoria.");
+        }
+        
+        // NUEVO: Usar parámetros con tipo específico para SQL Server
         $sql = "INSERT INTO reparacion (id_usuario, id_activo, id_lugar_reparacion, id_estado_reparacion, fecha, descripcion, costo, tiempo_inactividad) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                VALUES (?, ?, ?, ?, CAST(? AS DATE), ?, ?, ?)";
         $params = [$id_usuario, $id_activo, $id_lugar_reparacion, $id_estado_reparacion, $fecha, $descripcion, $costo, $tiempo_inactividad];
+        
+        error_log("DEBUG CREAR: SQL = " . $sql);
+        error_log("DEBUG CREAR: Parámetros = " . print_r($params, true));
+        
     } elseif ($accion === "editar" && !empty($id_reparacion)) {
+        // CORREGIDO: Validaciones adicionales para editar
+        if (empty($fecha)) {
+            die("❌ Error: La fecha es obligatoria.");
+        }
+        
+        // NUEVO: Usar CAST para asegurar el tipo correcto en SQL Server
         $sql = "UPDATE reparacion 
-                SET id_activo = ?, id_lugar_reparacion = ?, id_estado_reparacion = ?, fecha = ?, descripcion = ?, costo = ?, tiempo_inactividad = ?
+                SET id_activo = ?, id_lugar_reparacion = ?, id_estado_reparacion = ?, fecha = CAST(? AS DATE), descripcion = ?, costo = ?, tiempo_inactividad = ?
                 WHERE id_reparacion = ?";
         $params = [$id_activo, $id_lugar_reparacion, $id_estado_reparacion, $fecha, $descripcion, $costo, $tiempo_inactividad, $id_reparacion];
+        
+        error_log("DEBUG EDITAR: SQL = " . $sql);
+        error_log("DEBUG EDITAR: Parámetros = " . print_r($params, true));
+        
     } elseif ($accion === "eliminar" && !empty($id_reparacion)) {
         // Primero eliminar cambios de hardware relacionados
         $sqlCambios = "DELETE FROM cambio_hardware WHERE id_reparacion = ?";
@@ -567,11 +659,14 @@ if($_SERVER["REQUEST_METHOD"] === "POST") {
     $stmt = sqlsrv_query($conn, $sql, $params);
 
     if ($stmt) {
+        error_log("DEBUG: Operación exitosa para acción: " . $accion);
         header("Location: ../views/crud_reparacion.php?success=1");
         exit;
     } else {
+        $errors = sqlsrv_errors();
+        error_log("DEBUG: Error en SQL: " . print_r($errors, true));
         echo "Error en la operación:<br>";
-        print_r(sqlsrv_errors());
+        print_r($errors);
     }
 }
 
@@ -1057,5 +1152,205 @@ if ($_SERVER["REQUEST_METHOD"] === "GET" && isset($_GET['action']) && $_GET['act
         exit;
     }
 }
-?>
 
+// CORREGIDO: Endpoint para obtener reparaciones (agregar este nuevo endpoint)
+if ($_SERVER["REQUEST_METHOD"] === "GET" && isset($_GET['action']) && $_GET['action'] === 'get_reparaciones') {
+    try {
+        $sql = "SELECT r.*, 
+                       CASE 
+                           WHEN a.id_laptop IS NOT NULL THEN ISNULL(l.nombreEquipo, 'Sin nombre')
+                           WHEN a.id_pc IS NOT NULL THEN ISNULL(p.nombreEquipo, 'Sin nombre') 
+                           WHEN a.id_servidor IS NOT NULL THEN ISNULL(s.nombreEquipo, 'Sin nombre')
+                           ELSE 'Activo sin tipo'
+                       END as nombre_equipo,
+                       ISNULL(a.tipo_activo, 'Sin tipo') as tipo_activo,
+                       ISNULL(lr.nombre_lugar, 'Sin lugar') as nombre_lugar,
+                       ISNULL(er.nombre_estado, 'Sin estado') as nombre_estado,
+                       CASE 
+                           WHEN asig.id_persona IS NOT NULL THEN CONCAT(per.nombre, ' ', per.apellido)
+                           ELSE 'Sin asignar'
+                       END as persona_asignada
+                FROM reparacion r
+                INNER JOIN activo a ON r.id_activo = a.id_activo
+                LEFT JOIN laptop l ON a.id_laptop = l.id_laptop
+                LEFT JOIN pc p ON a.id_pc = p.id_pc
+                LEFT JOIN servidor s ON a.id_servidor = s.id_servidor
+                LEFT JOIN lugar_reparacion lr ON r.id_lugar_reparacion = lr.id_lugar
+                LEFT JOIN estado_reparacion er ON r.id_estado_reparacion = er.id_estado_reparacion
+                LEFT JOIN (
+                    SELECT id_activo, id_persona, 
+                           ROW_NUMBER() OVER (PARTITION BY id_activo ORDER BY fecha_asignacion DESC) as rn
+                    FROM asignacion 
+                    WHERE fecha_retorno IS NULL
+                ) asig ON a.id_activo = asig.id_activo AND asig.rn = 1
+                LEFT JOIN persona per ON asig.id_persona = per.id_persona
+                ORDER BY r.fecha DESC";
+                
+        $stmt = sqlsrv_query($conn, $sql);
+        
+        if ($stmt === false) {
+            throw new Exception("Error en consulta de reparaciones: " . print_r(sqlsrv_errors(), true));
+        }
+        
+        $reparaciones = [];
+        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+            // CORREGIDO: Formatear fecha si es un objeto DateTime
+            if ($row['fecha'] instanceof DateTime) {
+                $row['fecha'] = $row['fecha']->format('Y-m-d');
+            }
+            
+            // CORREGIDO: Asegurar que tiempo_inactividad mantenga el valor 0 como número
+            if (isset($row['tiempo_inactividad'])) {
+                $row['tiempo_inactividad'] = (int)$row['tiempo_inactividad'];
+            }
+            
+            $reparaciones[] = $row;
+        }
+        
+        header('Content-Type: application/json');
+        echo json_encode($reparaciones);
+        exit;
+        
+    } catch (Exception $e) {
+        error_log("Error obteniendo reparaciones: " . $e->getMessage());
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false, 
+            'error' => 'Error obteniendo reparaciones: ' . $e->getMessage()
+        ]);
+        exit;
+    }
+}
+
+// CORREGIDO: Endpoint para obtener activos
+if ($_SERVER["REQUEST_METHOD"] === "GET" && isset($_GET['action']) && $_GET['action'] === 'get_activos') {
+    try {
+        $sql = "SELECT a.id_activo, a.tipo_activo,
+                       CASE 
+                           WHEN a.id_laptop IS NOT NULL THEN ISNULL(l.nombreEquipo, 'Sin nombre')
+                           WHEN a.id_pc IS NOT NULL THEN ISNULL(p.nombreEquipo, 'Sin nombre')
+                           WHEN a.id_servidor IS NOT NULL THEN ISNULL(s.nombreEquipo, 'Sin nombre')
+                           ELSE 'Activo sin tipo'
+                       END as nombre_equipo
+                FROM activo a
+                LEFT JOIN laptop l ON a.id_laptop = l.id_laptop
+                LEFT JOIN pc p ON a.id_pc = p.id_pc
+                LEFT JOIN servidor s ON a.id_servidor = s.id_servidor
+                ORDER BY nombre_equipo";
+                
+        $stmt = sqlsrv_query($conn, $sql);
+        
+        if ($stmt === false) {
+            throw new Exception("Error en consulta de activos: " . print_r(sqlsrv_errors(), true));
+        }
+        
+        $activos = [];
+        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+            $activos[] = $row;
+        }
+        
+        header('Content-Type: application/json');
+        echo json_encode($activos);
+        exit;
+        
+    } catch (Exception $e) {
+        error_log("Error obteniendo activos: " . $e->getMessage());
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false, 
+            'error' => 'Error obteniendo activos: ' . $e->getMessage()
+        ]);
+        exit;
+    }
+}
+
+// CORREGIDO: Endpoint para obtener lugares
+if ($_SERVER["REQUEST_METHOD"] === "GET" && isset($_GET['action']) && $_GET['action'] === 'get_lugares') {
+    try {
+        $sql = "SELECT * FROM lugar_reparacion ORDER BY nombre_lugar";
+        $stmt = sqlsrv_query($conn, $sql);
+        
+        if ($stmt === false) {
+            throw new Exception("Error en consulta de lugares: " . print_r(sqlsrv_errors(), true));
+        }
+        
+        $lugares = [];
+        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+            $lugares[] = $row;
+        }
+        
+        header('Content-Type: application/json');
+        echo json_encode($lugares);
+        exit;
+        
+    } catch (Exception $e) {
+        error_log("Error obteniendo lugares: " . $e->getMessage());
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false, 
+            'error' => 'Error obteniendo lugares: ' . $e->getMessage()
+        ]);
+        exit;
+    }
+}
+
+// CORREGIDO: Endpoint para obtener estados
+if ($_SERVER["REQUEST_METHOD"] === "GET" && isset($_GET['action']) && $_GET['action'] === 'get_estados') {
+    try {
+        $sql = "SELECT * FROM estado_reparacion ORDER BY nombre_estado";
+        $stmt = sqlsrv_query($conn, $sql);
+        
+        if ($stmt === false) {
+            throw new Exception("Error en consulta de estados: " . print_r(sqlsrv_errors(), true));
+        }
+        
+        $estados = [];
+        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+            $estados[] = $row;
+        }
+        
+        header('Content-Type: application/json');
+        echo json_encode($estados);
+        exit;
+        
+    } catch (Exception $e) {
+        error_log("Error obteniendo estados: " . $e->getMessage());
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false, 
+            'error' => 'Error obteniendo estados: ' . $e->getMessage()
+        ]);
+        exit;
+    }
+}
+
+// CORREGIDO: Endpoint para obtener tipos de cambio
+if ($_SERVER["REQUEST_METHOD"] === "GET" && isset($_GET['action']) && $_GET['action'] === 'get_tipos_cambio') {
+    try {
+        $sql = "SELECT * FROM tipo_cambio ORDER BY nombre_tipo_cambio";
+        $stmt = sqlsrv_query($conn, $sql);
+        
+        if ($stmt === false) {
+            throw new Exception("Error en consulta de tipos de cambio: " . print_r(sqlsrv_errors(), true));
+        }
+        
+        $tipos_cambio = [];
+        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+            $tipos_cambio[] = $row;
+        }
+        
+        header('Content-Type: application/json');
+        echo json_encode($tipos_cambio);
+        exit;
+        
+    } catch (Exception $e) {
+        error_log("Error obteniendo tipos de cambio: " . $e->getMessage());
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false, 
+            'error' => 'Error obteniendo tipos de cambio: ' . $e->getMessage()
+        ]);
+        exit;
+    }
+}
+?>
